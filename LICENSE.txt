@@ -1,0 +1,127 @@
+﻿ENDBENUTZER-LIZENZVEREINBARUNG
+Zero1 checkout
+
+Diese Vereinbarung wird geschlossen zwischen Moritz Locher, Null1 media
+(nachfolgend "Lizenzgeber"), und der natürlichen oder juristischen Person, die
+diese Software installiert oder nutzt (nachfolgend "Lizenznehmer").
+
+Mit der Installation oder der Nutzung von Zero1 checkout erklärt sich der
+Lizenznehmer mit diesen Bedingungen einverstanden. Wer ihnen nicht zustimmt,
+darf die Software weder installieren noch nutzen.
+
+
+1. GEGENSTAND
+
+Zero1 checkout ist eine Kassensoftware für den Verkauf von Speisen, Getränken
+und weiteren Artikeln bei Veranstaltungen des Turnverein 1905 Fridingen e. V.
+samt Ausgabe von Bons.
+
+Die Software ist keine freie Software und kein Open Source. Sämtliche Rechte an
+ihr, an ihrem Quelltext und an den mitgelieferten Inhalten verbleiben beim
+Lizenzgeber. Alle Rechte vorbehalten.
+
+
+2. NUTZUNGSRECHT
+
+Der Lizenzgeber räumt dem Lizenznehmer ein einfaches, nicht ausschließliches,
+nicht übertragbares und widerrufliches Recht ein, die Software in der
+überlassenen Fassung auf den Geräten zu nutzen, die im Verwaltungsbereich des
+Turnverein 1905 Fridingen e. V. freigeschaltet wurden.
+
+Ohne eine solche Freischaltung (Kopplungscode) ist jede Nutzung untersagt.
+
+
+3. BESCHRÄNKUNGEN
+
+Dem Lizenznehmer ist insbesondere untersagt:
+
+  a) die Weitergabe, Vermietung, Verleihung, Unterlizenzierung oder öffentliche
+     Zugänglichmachung der Software oder eines Kopplungscodes;
+
+  b) die Vervielfältigung über die für die bestimmungsgemäße Nutzung und
+     eine Sicherungskopie erforderliche Anzahl hinaus;
+
+  c) die Bearbeitung, Rückübersetzung, Entkompilierung oder Disassemblierung,
+     soweit nicht § 69e UrhG dies zwingend gestattet;
+
+  d) das Entfernen oder Verändern von Urheberrechtsvermerken;
+
+  e) das Umgehen der Freischaltung oder des Aktualisierungsverfahrens.
+
+
+4. PERSONENBEZOGENE DATEN
+
+Die Software hält eine Kopie der Kassendaten des Vereins auf dem Gerät, darunter
+Artikel, Preise, Veranstaltungen und die an diesem Gerät erfassten Verkäufe.
+Diese Daten sind ausschließlich für den Kassenbetrieb und dessen Auswertung
+bestimmt. Eine Weitergabe, Veröffentlichung oder anderweitige Verwendung ist
+untersagt.
+
+Der Lizenznehmer sorgt dafür, dass Geräte mit der Software nicht unbeaufsichtigt
+zugänglich sind, und lässt ein verlorenes Gerät umgehend im Verwaltungsbereich
+des Vereins sperren. Für die Einhaltung des Datenschutzrechts im Rahmen
+seiner Nutzung ist der Lizenznehmer verantwortlich.
+
+
+5. ABGLEICH UND AKTUALISIERUNGEN
+
+Die Software gleicht ihren Bestand mit dem Server des Vereins ab, sobald
+eine Internetverbindung besteht, und prüft beim Start selbsttätig, ob eine
+neuere Fassung vorliegt.
+
+Dabei werden das Gerätemerkmal, die an diesem Gerät vorgenommenen Änderungen
+sowie die für die Verbindung technisch notwendigen Daten übertragen.
+
+
+6. KOMPONENTEN DRITTER
+
+Die Software enthält Komponenten Dritter, die eigenen Lizenzbedingungen
+unterliegen, unter anderem Electron, Node.js, SQLite, Bootstrap und Font Awesome.
+
+Für die jeweilige Komponente gehen deren Bedingungen dieser Vereinbarung vor.
+Eine Übersicht stellt der Lizenzgeber auf Anfrage bereit.
+
+
+7. GEWÄHRLEISTUNG
+
+Die Software wird in der jeweils überlassenen Fassung bereitgestellt. Der
+Lizenzgeber übernimmt keine Gewähr für eine ununterbrochene oder fehlerfreie
+Nutzbarkeit.
+
+
+8. HAFTUNG
+
+Der Lizenzgeber haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit
+sowie bei der Verletzung von Leben, Körper oder Gesundheit.
+
+Bei einfacher Fahrlässigkeit haftet er nur bei der Verletzung einer
+wesentlichen Vertragspflicht und der Höhe nach begrenzt auf den
+vertragstypischen, vorhersehbaren Schaden. Im Übrigen ist die Haftung
+ausgeschlossen.
+
+Die Haftung nach dem Produkthaftungsgesetz bleibt unberührt.
+
+
+9. LAUFZEIT
+
+Das Nutzungsrecht gilt auf unbestimmte Zeit. Der Lizenzgeber kann es bei einem
+erheblichen Verstoß gegen diese Vereinbarung mit sofortiger Wirkung widerrufen.
+
+In diesem Fall hat der Lizenznehmer die Nutzung einzustellen und die Software
+von seinen Geräten zu entfernen.
+
+
+10. SCHLUSSBESTIMMUNGEN
+
+Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des
+UN-Kaufrechts.
+
+Sollte eine Bestimmung dieser Vereinbarung unwirksam sein oder werden, bleibt
+die Wirksamkeit der übrigen Bestimmungen unberührt.
+
+
+LIZENZGEBER
+
+Moritz Locher
+Null1 media
+https://null1.media

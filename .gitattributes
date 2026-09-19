@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Die Lizenzseite des Installers. NSIS zeigt sie in einem Windows-Steuerelement
+# an; ohne CRLF stuende alles in einer Zeile. Die Datei traegt ausserdem ein
+# UTF-8-BOM, sonst werden die Umlaute zu Zeichensalat.
+LICENSE.txt text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.sqlite binary

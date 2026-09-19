@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
+    <title>Zero1 checkout — Einstellungen</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/fontawesome.min.css">
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <div class="settings">
+      <h1>Einstellungen</h1>
+      <p class="lead">Verbindung zum Vereinsserver und diese Installation.</p>
+
+      <section>
+        <h2>Verbindung</h2>
+        <dl class="facts">
+          <dt>Kasse</dt><dd id="device" class="selectable">–</dd>
+          <dt>Verein</dt><dd id="club">–</dd>
+          <dt>Server</dt><dd id="server" class="selectable">–</dd>
+          <dt>Status</dt><dd id="status">–</dd>
+          <dt>Letzter Abgleich</dt><dd id="last-sync">–</dd>
+          <dt>Nicht übertragen</dt><dd id="pending">–</dd>
+        </dl>
+        <div class="row-actions">
+          <button id="sync-now" class="btn-kasse" type="button"><i class="fas fa-sync-alt"></i>Jetzt abgleichen</button>
+        </div>
+        <p id="sync-message" class="message" hidden></p>
+      </section>
+
+      <section>
+        <h2>Neu koppeln</h2>
+        <p>Nötig, wenn die Kasse im Adminbereich gesperrt oder für sie ein neuer Kopplungscode erzeugt wurde. Was auf dieser Kasse noch nicht übertragen ist, bleibt erhalten und geht nach dem Koppeln hinüber.</p>
+        <form id="pair-form">
+          <div class="field">
+            <label for="code">Kopplungscode</label>
+            <input id="code" class="code" type="text" maxlength="9" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX">
+            <small>Adminbereich von tv-fridingen.de → Kasse → Kassen</small>
+          </div>
+          <button class="btn-kasse" type="submit"><i class="fas fa-link"></i>Koppeln</button>
+        </form>
+        <p id="pair-message" class="message" hidden></p>
+      </section>
+
+      <section>
+        <h2>Diese Installation</h2>
+        <dl class="facts">
+          <dt>Version</dt><dd id="version">–</dd>
+          <dt>Seriennummer</dt><dd id="serial">–</dd>
+          <dt>Aktualisierung</dt><dd id="update-server" class="selectable">–</dd>
+          <dt>Datenbank</dt><dd id="schema">–</dd>
+          <dt>Datenverzeichnis</dt><dd id="data-dir" class="selectable">–</dd>
+        </dl>
+        <div class="row-actions">
+          <button id="open-data" class="btn-kasse quiet" type="button"><i class="fas fa-folder-open"></i>Datenverzeichnis öffnen</button>
+          <button id="open-logs" class="btn-kasse quiet" type="button"><i class="fas fa-file-alt"></i>Protokolle öffnen</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/settings.js"></script>
+  </body>
+</html>

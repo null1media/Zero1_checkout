@@ -1,0 +1,67 @@
+{
+  "name": "zero1-checkout",
+  "version": "0.1.0",
+  "description": "Zero1 checkout",
+  "main": "main.js",
+  "scripts": {
+    "start": "node build/start.js",
+    "test": "node test/run.js",
+    "dist": "electron-builder --win --publish never",
+    "release": "node build/release.js"
+  },
+  "author": "Moritz Locher",
+  "license": "UNLICENSED",
+  "homepage": "https://null1.media",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "media.null1.zero1checkout",
+    "productName": "Zero1 checkout",
+    "copyright": "Zero1 checkout - Copyright © 2026 Moritz Locher, Null1 media - Alle Rechte vorbehalten.",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "utils/**/*",
+      "public/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "license": "LICENSE.txt",
+      "installerIcon": "build/icon-dark.ico",
+      "installerHeaderIcon": "build/icon-dark.ico",
+      "uninstallerIcon": "build/icon-dark.ico",
+      "shortcutName": "Zero1 checkout"
+    }
+  },
+  "allowScripts": {
+    "electron-winstaller": false
+  }
+}

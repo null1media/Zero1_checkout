@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Laufzeitdaten dieser Installation.
+#
+# Konfiguration, Gerätetoken, die lokale Datenbank mit Namen und das Protokoll
+# liegen im Datenverzeichnis: im Quelltextbetrieb unter .data, mit der Hülle
+# unter %APPDATA%\zero1-checkout. .data steht hier, weil es neben dem
+# Quelltext liegt.
+# ---------------------------------------------------------------------------
+/.data/
+
+# ---------------------------------------------------------------------------
+# npm. package-lock.json gehört bewusst INS Repo, wie bei Zero1 arena: npm
+# install läuft auf dem Entwicklungsrechner, nicht auf dem Server.
+# ---------------------------------------------------------------------------
+/node_modules/
+
+# ---------------------------------------------------------------------------
+# Erzeugnisse von npm run dist und den Tests
+# ---------------------------------------------------------------------------
+/dist/
+/test/.tmp/
+
+# ---------------------------------------------------------------------------
+# Werkzeug-lokal
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+.vscode/sftp.json
+.DS_Store
+Thumbs.db
+*.log

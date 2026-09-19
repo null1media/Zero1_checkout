@@ -1,0 +1,514 @@
+/***
+====================================================================
+  Zero1 checkout
+  Copyright by Null1 media, Moritz Locher
+
+  Farben und Schrift des Adminbereichs von tv-fridingen.de: Anthrazit als
+  Grund, Vereinsrot als Akzent, Rubik. Dunkel, weil die Kasse im Festzelt
+  und abends im Vereinsheim steht. Ladebildschirm und Installer bleiben im
+  Design von Null1 media (utils/splash.js).
+====================================================================
+***/
+
+@font-face { font-display: swap; font-family: "Rubik"; font-weight: 300; src: url("../fonts/rubik-v28-latin-300.woff2") format("woff2"); }
+@font-face { font-display: swap; font-family: "Rubik"; font-weight: 400; src: url("../fonts/rubik-v28-latin-regular.woff2") format("woff2"); }
+@font-face { font-display: swap; font-family: "Rubik"; font-weight: 700; src: url("../fonts/rubik-v28-latin-700.woff2") format("woff2"); }
+
+:root {
+  --primary-color: #2b292a;
+  --primary-light: #363537;
+  --primary-lighter: #434144;
+  --primary-dark: #1f1e1f;
+  --accent-color: #c32229;
+  --accent-light: #e2434a;
+  --text-color: #f4f4f4;
+  --muted-color: #a9a6a8;
+  --divider-color: rgba(255, 255, 255, .09);
+  --success-color: #31ce36;
+  --warning-color: #ffad46;
+  --error-color: #f25961;
+  --default-font: "Rubik", "Segoe UI", sans-serif;
+  --radius: 10px;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--default-font);
+  font-size: 15px;
+  color: var(--text-color);
+  background: var(--primary-color);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+input, textarea, .selectable {
+  user-select: text;
+}
+
+button {
+  font-family: inherit;
+}
+
+/***
+====================================================================
+  Rahmen: Kopfleiste, Inhalt, Fußzeile
+====================================================================
+***/
+.kasse {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 24px;
+  background: linear-gradient(90deg, var(--primary-dark), var(--primary-color) 45%, var(--primary-light));
+  border-bottom: 3px solid var(--accent-color);
+}
+
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.topbar .brand img {
+  width: 46px;
+  height: 46px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.topbar h1 small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: .08em;
+  color: var(--muted-color);
+}
+
+.topbar .device {
+  padding: 4px 12px;
+  border: 1px solid var(--divider-color);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.topbar .spacer {
+  flex: 1;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .18);
+}
+
+/* Abgleich-Status */
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border: 1px solid var(--divider-color);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .03);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-color);
+}
+
+.sync-pill .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted-color);
+  flex: none;
+}
+
+.sync-pill[data-state="verbunden"] .dot { background: var(--success-color); }
+.sync-pill[data-state="läuft"] .dot { background: var(--warning-color); animation: puls 1s ease-in-out infinite; }
+.sync-pill[data-state="offline"] .dot { background: var(--muted-color); }
+.sync-pill[data-state="fehler"] .dot,
+.sync-pill[data-state="gesperrt"] .dot { background: var(--error-color); }
+
+.sync-pill .pending {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-color);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+@keyframes puls {
+  50% { opacity: .35; }
+}
+
+.banner {
+  padding: 10px 24px;
+  background: rgba(242, 89, 97, .15);
+  border-bottom: 1px solid rgba(242, 89, 97, .35);
+  color: #ffd6d8;
+  font-size: 14px;
+}
+
+.banner button {
+  margin-left: 12px;
+}
+
+.footer {
+  display: flex;
+  gap: 18px;
+  padding: 8px 24px;
+  border-top: 1px solid var(--divider-color);
+  font-size: 12px;
+  color: var(--muted-color);
+}
+
+.footer .spacer {
+  flex: 1;
+}
+
+/***
+====================================================================
+  Arbeitsfläche
+
+  Nicht .placeholder: Die Klasse gehört Bootstrap (Lade-Platzhalter,
+  grauer Grund, halbe Deckkraft).
+====================================================================
+***/
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 24px;
+}
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: var(--primary-light);
+  overflow: hidden;
+}
+
+.empty-state {
+  margin: auto;
+  max-width: 520px;
+  text-align: center;
+  color: var(--muted-color);
+}
+
+.empty-state img {
+  display: block;
+  width: 140px;
+  margin: 0 auto 22px;
+  opacity: .9;
+}
+
+.empty-state h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 18px;
+  margin: 0 0 20px;
+}
+
+.facts dt {
+  color: var(--muted-color);
+  font-weight: 400;
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+/***
+====================================================================
+  Dialoge
+====================================================================
+***/
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 14, 15, .75);
+  animation: hinein .15s ease;
+}
+
+.dialog-kasse {
+  width: min(600px, calc(100vw - 48px));
+  padding: 26px 28px;
+  border: 1px solid var(--divider-color);
+  border-top: 3px solid var(--accent-color);
+  border-radius: 14px;
+  background: var(--primary-light);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+
+.dialog-kasse h3 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.dialog-kasse p {
+  margin: 0 0 18px;
+  color: var(--text-color);
+}
+
+.dialog-kasse .highlight {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--primary-color);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dialog-kasse .field input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 18px;
+}
+
+.dialog-kasse .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.dialog-kasse .buttons .btn-kasse {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+/***
+====================================================================
+  Knöpfe
+====================================================================
+***/
+.btn-kasse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--accent-color);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .15s ease, opacity .15s ease;
+}
+
+.btn-kasse:hover {
+  background: var(--accent-light);
+}
+
+.btn-kasse.quiet {
+  background: transparent;
+  border-color: rgba(255, 255, 255, .2);
+  color: var(--text-color);
+}
+
+.btn-kasse.quiet:hover {
+  background: rgba(255, 255, 255, .06);
+}
+
+.btn-kasse.danger {
+  background: transparent;
+  border-color: rgba(242, 89, 97, .5);
+  color: #ffb4b8;
+}
+
+.btn-kasse.danger:hover {
+  background: rgba(242, 89, 97, .15);
+}
+
+.btn-kasse:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+/***
+====================================================================
+  Hinweise
+====================================================================
+***/
+.toasts {
+  position: fixed;
+  right: 24px;
+  bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 50;
+}
+
+.toast-kasse {
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--primary-lighter);
+  border-left: 4px solid var(--accent-color);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  font-size: 14px;
+  animation: hinein .25s ease;
+}
+
+.toast-kasse.info { border-left-color: var(--warning-color); }
+.toast-kasse.ok { border-left-color: var(--success-color); }
+
+@keyframes hinein {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/***
+====================================================================
+  Einstellungen
+====================================================================
+***/
+.settings {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 28px 48px;
+  user-select: text;
+}
+
+.settings h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.settings .lead {
+  margin: 0 0 24px;
+  color: var(--muted-color);
+}
+
+.settings section {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: var(--primary-light);
+}
+
+.settings h2 {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--accent-light);
+}
+
+.settings .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.settings .hint {
+  display: block;
+  color: var(--muted-color);
+  font-size: 13px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.field small {
+  color: var(--muted-color);
+}
+
+.field input {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: var(--text-color);
+  font-size: 15px;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: var(--accent-color);
+}
+
+.field input.code {
+  max-width: 220px;
+  font-size: 20px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.message {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.message.error { color: #ffb4b8; }
+.message.ok { color: #8fe892; }
