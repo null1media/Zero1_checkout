@@ -74,7 +74,12 @@ Wer eine Funktion in die Oberfläche bringt, trägt sie in `preload.js` **und**
 6. **Abgleich.** Beim allerersten Start Pflicht, mit „Erneut versuchen / Beenden".
    Danach höchstens `sync.startTimeoutMs` warten. Antwortet der Server 401:
    Token weg, neu koppeln.
-7. Kassenfenster. Der Ladebildschirm schließt bei `ready-to-show`.
+7. Kassenfenster. Der Ladebildschirm schließt bei `ready-to-show`, aber erst,
+   wenn er **mindestens 3 Sekunden** gestanden hat (`SPLASH_MIN_TOTAL_MS`,
+   gezählt ab `createSplash()`; `splashHold()` hält die Übergabe zurück).
+   Ohne das blitzte er auf einem schnellen Rechner mit lokalem Bestand nur
+   auf. Jede einzelne Meldung steht davon unberührt mindestens 420 ms. Die
+   Abbruchwege schließen ihn weiter sofort.
 
 ## Datenverzeichnis
 

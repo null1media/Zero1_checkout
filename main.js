@@ -111,6 +111,7 @@ function splashHtml() {
 }
 
 function createSplash() {
+  splashOpenedAt = Date.now();
   splash = new BrowserWindow({
     // Breite wie bei Zero1 arena (Platz für die Copyright-Zeile), höher für
     // die Abfrage des Kopplungscodes samt Knöpfen.
@@ -134,9 +135,30 @@ function createSplash() {
 // Kommt in der Zeit eine neue, ersetzt sie die wartende (wie bei Zero1 arena).
 const SPLASH_MIN_MS = 420;
 
+// Und der Ladebildschirm als Ganzes bleibt mindestens drei Sekunden stehen,
+// auch wenn der Start schneller fertig ist: mit lokalem Bestand und ohne
+// Aktualisierung blitzte er sonst nur kurz auf.
+const SPLASH_MIN_TOTAL_MS = 3000;
+
 let splashWaiting = null,
     splashTimer = null,
-    splashLast = 0;
+    splashLast = 0,
+    splashOpenedAt = 0;
+
+// Die Uebergabe an das Kassenfenster: erst, wenn die drei Sekunden voll
+// sind. Ohne Ladebildschirm — das Fenster wird spaeter noch einmal
+// geoeffnet — geschieht sie sofort.
+function splashHold(done) {
+  const rest = splash && !splash.isDestroyed() ? SPLASH_MIN_TOTAL_MS - (Date.now() - splashOpenedAt) : 0;
+
+  if (rest > 0) {
+    setTimeout(done, rest);
+
+    return;
+  }
+
+  done();
+}
 
 function splashSend(message) {
   if (splash && !splash.isDestroyed()) {
@@ -431,9 +453,11 @@ function createMainWindow() {
   // Der Ladebildschirm verschwindet genau dann, wenn die Kasse gezeichnet
   // ist — nicht früher, sonst blitzt dazwischen der Schreibtisch auf.
   mainWindow.once("ready-to-show", () => {
-    closeSplash();
-    mainWindow.maximize();
-    mainWindow.show();
+    splashHold(() => {
+      closeSplash();
+      mainWindow.maximize();
+      mainWindow.show();
+    });
   });
 
   mainWindow.loadFile(path.join(__dirname, "public", "index.html"));
