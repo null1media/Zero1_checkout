@@ -1,6 +1,6 @@
 {
   "name": "zero1-checkout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero1 checkout",
   "main": "main.js",
   "scripts": {
