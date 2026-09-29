@@ -1,6 +1,6 @@
 // Eine Version herausgeben.
 //
-// Der Cron auf tv-fridingen.de (lib/cron/checkout.php) baut die Auslieferung
+// Der Cron auf checkout.null1.media (lib/cron.php) baut die Auslieferung
 // nur, wenn die Version in package.json steigt. Wer eine Änderung pusht, ohne
 // sie anzuheben, erreicht damit keine einzige Kasse — und nichts sagt es.
 // Dieses Skript führt deshalb die ganze Kette in einem Befehl: Tests,
@@ -121,4 +121,4 @@ run("git", ["push", "origin", "main"]);
 run("git", ["push", "origin", `v${next}`]);
 
 console.log(`\nVersion ${next} ist auf GitHub.`);
-console.log("Plesk rollt sie nach lib/app/zero1-checkout auf tv-fridingen.de aus, der Cron baut die Auslieferung beim nächsten Lauf.\n");
+console.log("Plesk rollt sie nach lib/app/zero1-checkout auf checkout.null1.media aus, der Cron baut die Auslieferung beim nächsten Lauf.\n");
