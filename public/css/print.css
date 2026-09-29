@@ -1,0 +1,147 @@
+/*
+  Druck auf dem Bondrucker. Schwarz auf Weiß, keine Flächen: Thermodrucker
+  kennen keine Graustufen, und volle Flächen kosten Papier und Zeit.
+*/
+
+@font-face { font-family: "Rubik"; font-weight: 400; src: url("../fonts/rubik-v28-latin-regular.woff2") format("woff2"); }
+@font-face { font-family: "Rubik"; font-weight: 700; src: url("../fonts/rubik-v28-latin-700.woff2") format("woff2"); }
+
+@page {
+  margin: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+}
+
+body {
+  width: 72mm;
+  padding: 0 4mm;
+  font-family: "Rubik", "Segoe UI", sans-serif;
+  font-size: 11pt;
+  line-height: 1.25;
+}
+
+#paper {
+  padding: 3mm 0 6mm;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding-bottom: 2mm;
+  border-bottom: 1px solid #000;
+}
+
+.head img {
+  width: 12mm;
+  height: 12mm;
+  filter: grayscale(1) contrast(1.4);
+}
+
+.head .event {
+  font-weight: 700;
+  font-size: 10pt;
+}
+
+.head .small {
+  font-size: 8pt;
+}
+
+/* Einzelbon: der Artikel groß, damit ihn die Ausgabe auf einen Blick liest */
+.bon-article {
+  margin: 5mm 0 2mm;
+  font-size: 22pt;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  word-break: break-word;
+}
+
+.bon-price {
+  text-align: center;
+  font-size: 13pt;
+}
+
+.bon-tag {
+  display: block;
+  width: fit-content;
+  margin: 2mm auto 0;
+  padding: 0 2mm;
+  border: 1px solid #000;
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.meta {
+  margin-top: 4mm;
+  padding-top: 2mm;
+  border-top: 1px dashed #000;
+  font-size: 8pt;
+  text-align: center;
+}
+
+.footer {
+  margin-top: 2mm;
+  font-size: 9pt;
+  text-align: center;
+}
+
+/* Sammelbeleg und Tagesabschluss */
+.title {
+  margin: 3mm 0 2mm;
+  font-size: 13pt;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+
+td {
+  padding: .6mm 0;
+  vertical-align: top;
+}
+
+td.num {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 2mm;
+}
+
+tr.sum td {
+  padding-top: 1.5mm;
+  border-top: 1px solid #000;
+  font-weight: 700;
+  font-size: 11pt;
+}
+
+tr.group td {
+  padding-top: 2mm;
+  font-weight: 700;
+}
+
+.cancelled {
+  margin: 3mm 0;
+  padding: 1mm;
+  border: 2px solid #000;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.signature {
+  margin-top: 12mm;
+  border-top: 1px solid #000;
+  font-size: 8pt;
+  text-align: center;
+}

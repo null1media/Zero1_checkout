@@ -150,6 +150,10 @@ class Sync extends EventEmitter {
       this.emit("notices", notices);
     }
 
+    // Der Bestand kann sich geändert haben (Artikel, Preise, PIN): Die
+    // Oberfläche zeichnet neu.
+    this.emit("synced", { full: Boolean(response.full) });
+
     return { ok: true, full: Boolean(response.full), notices };
   }
 

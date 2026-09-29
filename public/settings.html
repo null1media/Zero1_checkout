@@ -30,6 +30,21 @@
       </section>
 
       <section>
+        <h2>Bondrucker</h2>
+        <p>Je verkauftem Stück ein Bon, still und ohne Rückfrage. An den Kassen ist der Bondrucker als Standarddrucker eingerichtet; hier nur etwas ändern, wenn das nicht so ist.</p>
+        <div class="field">
+          <label for="printer">Drucker</label>
+          <select id="printer"></select>
+        </div>
+        <label class="toggle"><input id="printer-preview" type="checkbox"><span class="knob"></span><span>Nur Vorschau<small>Statt zu drucken PDFs im Datenverzeichnis ablegen (Ordner bons) – für Probeläufe ohne Drucker.</small></span></label>
+        <div class="row-actions">
+          <button id="printer-save" class="btn-kasse" type="button"><i class="fas fa-check"></i>Speichern</button>
+          <button id="printer-test" class="btn-kasse quiet" type="button"><i class="fas fa-print"></i>Testbon drucken</button>
+        </div>
+        <p id="printer-message" class="message" hidden></p>
+      </section>
+
+      <section>
         <h2>Neu koppeln</h2>
         <p>Nötig, wenn die Kasse im Adminbereich gesperrt oder für sie ein neuer Kopplungscode erzeugt wurde. Was auf dieser Kasse noch nicht übertragen ist, bleibt erhalten und geht nach dem Koppeln hinüber.</p>
         <form id="pair-form">

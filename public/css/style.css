@@ -53,6 +53,22 @@ input, textarea, .selectable {
   user-select: text;
 }
 
+/* Scrollleisten im dunklen Design */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid var(--primary-color);
+  border-radius: 999px;
+  background: var(--primary-lighter);
+}
+
 button {
   font-family: inherit;
 }
@@ -72,7 +88,7 @@ button {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 12px 24px;
+  padding: 7px 18px;
   background: linear-gradient(90deg, var(--primary-dark), var(--primary-color) 45%, var(--primary-light));
   border-bottom: 3px solid var(--accent-color);
 }
@@ -84,13 +100,13 @@ button {
 }
 
 .topbar .brand img {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -191,7 +207,7 @@ button {
 .footer {
   display: flex;
   gap: 18px;
-  padding: 8px 24px;
+  padding: 5px 18px;
   border-top: 1px solid var(--divider-color);
   font-size: 12px;
   color: var(--muted-color);
@@ -212,8 +228,10 @@ button {
 .workspace {
   display: flex;
   flex: 1;
+  gap: 14px;
   min-height: 0;
-  padding: 18px 24px;
+  overflow: hidden;
+  padding: 12px 14px 12px 18px;
 }
 
 .panel {
@@ -267,6 +285,628 @@ button {
 
 /***
 ====================================================================
+  Artikel
+
+  Maße wie im Editor des Adminbereichs (tv-fridingen.de,
+  httpdocs/admin/css/kasse.css): Kategorien als Blöcke mit drei Tasten
+  je Zeile, die Blöcke fließen nebeneinander. Hier etwas größer, weil mit
+  dem Finger getippt wird. Wer die Anordnung ändert, zieht den Editor nach.
+====================================================================
+***/
+.products {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Spaltensatz statt Zeilen: Die Blöcke füllen jede Spalte von oben, eine
+   kurze Kategorie lässt so keinen Platz neben sich frei. Das innere Raster
+   hat keine feste Höhe, sonst liefen die Spalten seitlich hinaus. */
+.product-grid {
+  columns: 402px;
+  column-gap: 12px;
+}
+
+.products .empty-state {
+  margin-top: 60px;
+  column-span: all;
+}
+
+.block {
+  --cat: #6c757d;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  break-inside: avoid;
+  padding: 5px 8px 8px;
+  border-top: 4px solid var(--cat);
+  border-radius: 8px;
+  background: var(--primary-light);
+}
+
+.block header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 5px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted-color);
+}
+
+.block header .name {
+  flex: 1;
+}
+
+.block .handle,
+.block .edit-category,
+.block .add-article {
+  display: none;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(124px, 1fr));
+  gap: 6px;
+  min-height: 66px;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 66px;
+  padding: 6px 9px;
+  border: 0;
+  border-left: 6px solid var(--cat);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--primary-color);
+  text-align: left;
+  line-height: 1.15;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tile .name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tile .price {
+  font-size: 14px;
+}
+
+.tile .badge-kasse {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 10px;
+}
+
+.tile .count {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 2px solid var(--primary-color);
+  border-radius: 999px;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.tile:active,
+.tile.tapped {
+  animation: antippen .18s ease;
+}
+
+@keyframes antippen {
+  50% { transform: scale(.95); background: #ffe3e4; }
+}
+
+.tile.sold-out {
+  background: #bdbbbc;
+  color: #6f6d6e;
+  cursor: default;
+}
+
+/* Bearbeiten */
+.edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  background: rgba(255, 173, 70, .14);
+  border-bottom: 1px solid rgba(255, 173, 70, .4);
+  font-size: 14px;
+}
+
+.edit-bar .spacer {
+  flex: 1;
+}
+
+.editing .block .handle {
+  display: inline-block;
+  padding: 0 4px;
+  cursor: grab;
+}
+
+.editing .block .edit-category {
+  display: inline-block;
+  border: 0;
+  background: transparent;
+  color: var(--muted-color);
+  padding: 2px 6px;
+}
+
+.editing .block .add-article {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px dashed rgba(255, 255, 255, .3);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-color);
+}
+
+.editing .tile {
+  cursor: grab;
+  outline: 2px dashed rgba(255, 173, 70, .6);
+  outline-offset: -2px;
+}
+
+.editing .tile.sold-out {
+  cursor: grab;
+}
+
+/* Beim Bearbeiten ist der Bon gesperrt und darf abgeschnitten werden: Die
+   Leiste oben kostet Höhe, und die Seite soll nie scrollen. */
+.editing .till {
+  overflow: hidden;
+  opacity: .35;
+  pointer-events: none;
+}
+
+.editing .last-sale {
+  display: none;
+}
+
+.sortable-ghost {
+  opacity: .35;
+}
+
+/***
+====================================================================
+  Bon, Summe, Ziffernblock
+====================================================================
+***/
+.till {
+  display: flex;
+  flex: 0 0 360px;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.bon {
+  flex: 1;
+  min-height: 90px;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: var(--primary-light);
+}
+
+.bon li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--divider-color);
+  cursor: pointer;
+}
+
+.bon li.empty {
+  border: 0;
+  color: var(--muted-color);
+  font-size: 13px;
+  cursor: default;
+}
+
+.bon .qty {
+  width: 30px;
+  font-weight: 700;
+}
+
+.bon .name {
+  flex: 1;
+}
+
+.bon .name small,
+.bon li.return .sum {
+  color: var(--warning-color);
+}
+
+.bon .sum {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bon .minus {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--divider-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-color);
+}
+
+.last-sale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(49, 206, 54, .35);
+  border-radius: var(--radius);
+  background: rgba(49, 206, 54, .08);
+}
+
+.last-sale .info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--muted-color);
+}
+
+.last-sale strong {
+  font-size: 24px;
+  color: var(--text-color);
+}
+
+.totals {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--primary-dark);
+}
+
+.total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.total-row span {
+  color: var(--muted-color);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.total-row strong {
+  font-size: 32px;
+}
+
+.total-row strong.negative {
+  color: var(--warning-color);
+}
+
+.given-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--muted-color);
+}
+
+.given-row b {
+  color: var(--text-color);
+  font-size: 17px;
+}
+
+.given-row b.short {
+  color: var(--error-color);
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.keypad button,
+.pad-keys button {
+  height: 40px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+  background: var(--primary-lighter);
+  color: var(--text-color);
+  font-size: 19px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+
+.keypad button:active,
+.pad-keys button:active {
+  background: var(--accent-color);
+}
+
+.keypad button.quick {
+  background: var(--primary-light);
+  color: var(--muted-color);
+  font-size: 15px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.actions .btn-kasse {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 13px;
+}
+
+.pay {
+  display: flex;
+  gap: 8px;
+}
+
+.pay-button {
+  flex: 1.4;
+  height: 54px;
+  font-size: 20px;
+}
+
+.pay-button.card {
+  flex: 1;
+  background: #1f6fb2;
+}
+
+.pay-button.card:hover {
+  background: #2c82cc;
+}
+
+/***
+====================================================================
+  Verwaltung: Menü, Übersichten
+====================================================================
+***/
+.menu-dialog {
+  width: min(760px, calc(100vw - 48px));
+}
+
+.menu-dialog .warning-text {
+  color: var(--warning-color);
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: var(--primary-color);
+  color: var(--text-color);
+  text-align: left;
+}
+
+.menu-item i {
+  font-size: 22px;
+  color: var(--accent-light);
+}
+
+.menu-item b {
+  font-size: 16px;
+}
+
+.menu-item small {
+  color: var(--muted-color);
+}
+
+.menu-item:disabled {
+  opacity: .4;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--primary-color);
+}
+
+.overlay-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 3px solid var(--accent-color);
+  background: var(--primary-dark);
+}
+
+.overlay-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.overlay-head .spacer {
+  flex: 1;
+}
+
+.overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+.lead-text,
+.hint-text {
+  color: var(--muted-color);
+}
+
+.hint-text {
+  font-size: 13px;
+}
+
+.table-kasse {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table-kasse th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--divider-color);
+  color: var(--muted-color);
+  font-weight: 400;
+  text-align: left;
+}
+
+.table-kasse td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--divider-color);
+  vertical-align: middle;
+}
+
+.table-kasse .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table-kasse tr.group td {
+  padding-top: 12px;
+  color: var(--accent-light);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.table-kasse tr.cancelled td {
+  color: var(--muted-color);
+  text-decoration: line-through;
+}
+
+.table-kasse tr.cancelled td.actions-cell {
+  text-decoration: none;
+}
+
+.table-kasse .actions-cell {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.table-kasse .actions-cell .btn-kasse {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary-lighter);
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+.day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  padding: 8px 14px;
+  border: 1px solid var(--divider-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-color);
+}
+
+.chip.active {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.panel-kasse {
+  padding: 14px 16px;
+  border: 1px solid var(--divider-color);
+  border-radius: var(--radius);
+  background: var(--primary-light);
+}
+
+.panel-kasse h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--accent-light);
+}
+
+.panel-kasse .facts dd {
+  text-align: right;
+}
+
+.panel-kasse .facts dd.big {
+  font-size: 20px;
+}
+
+.panel-kasse .facts dd.ok {
+  color: var(--success-color);
+}
+
+.panel-kasse .facts dd.off {
+  color: var(--error-color);
+}
+
+/***
+====================================================================
   Dialoge
 ====================================================================
 ***/
@@ -283,6 +923,9 @@ button {
 
 .dialog-kasse {
   width: min(600px, calc(100vw - 48px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
   padding: 26px 28px;
   border: 1px solid var(--divider-color);
   border-top: 3px solid var(--accent-color);
@@ -327,6 +970,188 @@ button {
 .dialog-kasse .buttons .btn-kasse {
   min-width: 110px;
   white-space: nowrap;
+}
+
+.field select {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: var(--text-color);
+  font-size: 15px;
+}
+
+/* Schalter statt Häkchen: mit dem Finger besser zu treffen */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.toggle input {
+  display: none;
+}
+
+.toggle .knob {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--primary-lighter);
+  transition: background .15s ease;
+}
+
+.toggle .knob::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .15s ease;
+}
+
+.toggle input:checked + .knob {
+  background: var(--accent-color);
+}
+
+.toggle input:checked + .knob::after {
+  transform: translateX(20px);
+}
+
+.toggle small {
+  display: block;
+  color: var(--muted-color);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  width: 38px;
+  height: 38px;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+
+.swatch.active {
+  border-color: #fff;
+}
+
+/* Kartenzahlung am SumUp-Terminal */
+.card-dialog .terminal-name {
+  color: var(--muted-color);
+}
+
+.card-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  margin-bottom: 18px;
+  font-size: 17px;
+}
+
+.card-state .spinner {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--primary-lighter);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: drehen .9s linear infinite;
+}
+
+.card-state[data-kind="error"] .spinner,
+.card-state[data-kind="ok"] .spinner {
+  animation: none;
+  border-color: currentColor;
+}
+
+.card-state[data-kind="error"] {
+  color: #ffb4b8;
+}
+
+.card-state[data-kind="ok"] {
+  color: #8fe892;
+}
+
+@keyframes drehen {
+  to { transform: rotate(360deg); }
+}
+
+/* Ziffernblock-Dialog: PIN und Beträge */
+.pad-dialog {
+  width: min(380px, calc(100vw - 48px));
+}
+
+.pad-display {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--primary-color);
+  font-size: 28px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.pad-display.pin {
+  text-align: center;
+  letter-spacing: .4em;
+}
+
+.pad-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.pad-keys button {
+  height: 52px;
+}
+
+.kind-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.kind-choice label {
+  cursor: pointer;
+}
+
+.kind-choice input {
+  display: none;
+}
+
+.kind-choice span {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border: 1px solid var(--divider-color);
+  border-radius: 8px;
+}
+
+.kind-choice small {
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+.kind-choice input:checked + span {
+  border-color: var(--accent-color);
+  background: rgba(195, 34, 41, .18);
 }
 
 /***
@@ -384,10 +1209,12 @@ button {
   Hinweise
 ====================================================================
 ***/
+/* Links unten, über den Artikeln: rechts stehen Bon und Bezahlknöpfe, die
+   ein Hinweis nicht verdecken darf. */
 .toasts {
   position: fixed;
-  right: 24px;
-  bottom: 48px;
+  left: 24px;
+  bottom: 40px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -407,6 +1234,10 @@ button {
 
 .toast-kasse.info { border-left-color: var(--warning-color); }
 .toast-kasse.ok { border-left-color: var(--success-color); }
+
+.toasts {
+  z-index: 200;
+}
 
 @keyframes hinein {
   from { opacity: 0; transform: translateY(8px); }

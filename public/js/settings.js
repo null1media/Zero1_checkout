@@ -84,6 +84,42 @@ $("pair-form").addEventListener("submit", async (e) => {
   load();
 });
 
+/* Bondrucker */
+
+async function loadPrinter() {
+  const config = await window.checkout.config(),
+        result = await window.checkout.printers(),
+        select = $("printer"),
+        current = (config.printer && config.printer.deviceName) || "";
+
+  select.innerHTML = '<option value="">Standarddrucker von Windows</option>'
+    + (result.ok ? result.printers : []).map((p) => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.displayName)}</option>`).join("");
+
+  // Ein eingestellter Drucker, den es gerade nicht gibt (ausgesteckt), bleibt
+  // sichtbar statt still auf "Standard" zu springen.
+  if (current && ![...select.options].some((o) => o.value === current)) {
+    select.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(current)}">${escapeHtml(current)} (nicht gefunden)</option>`);
+  }
+
+  select.value = current;
+  $("printer-preview").checked = Boolean(config.printer && config.printer.preview);
+}
+
+$("printer-save").addEventListener("click", async () => {
+  await window.checkout.saveConfig({ printer: { deviceName: $("printer").value, preview: $("printer-preview").checked } });
+  showMessage("printer-message", "Gespeichert.", "ok");
+});
+
+$("printer-test").addEventListener("click", async () => {
+  await window.checkout.saveConfig({ printer: { deviceName: $("printer").value, preview: $("printer-preview").checked } });
+
+  const result = await window.checkout.printTest();
+
+  showMessage("printer-message", result.ok ? ($("printer-preview").checked ? "Vorschau im Datenverzeichnis abgelegt (Ordner bons)." : "Der Testbon wird gedruckt.") : result.message, result.ok ? "ok" : "error");
+});
+
+loadPrinter();
+
 $("open-data").addEventListener("click", () => window.checkout.openPath("data"));
 $("open-logs").addEventListener("click", () => window.checkout.openPath("logs"));
 

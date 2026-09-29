@@ -33,6 +33,14 @@ const DEFAULTS = {
     // eine Viertelminute vor dem Ladebildschirm stehen.
     startTimeoutMs: 6000
   },
+  // Der Bondrucker. Leer heißt Standarddrucker — an den Kassen ist das der
+  // Bondrucker. preview legt statt zu drucken PDFs im Datenverzeichnis ab
+  // (Ordner bons), für Probeläufe ohne Drucker.
+  printer: {
+    enabled: true,
+    deviceName: "",
+    preview: false
+  },
   debug: false
 };
 

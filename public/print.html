@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <!-- Druckvorlage für den Bondrucker (80 mm, bedruckbar etwa 72 mm).
+         utils/printer.js lädt sie in ein unsichtbares Fenster, füllt sie über
+         renderPrint() und druckt je Zettel einen Auftrag. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
+    <title>Bon</title>
+    <link rel="stylesheet" href="css/print.css">
+  </head>
+  <body>
+    <main id="paper"></main>
+    <script src="js/print.js"></script>
+  </body>
+</html>

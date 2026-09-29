@@ -13,7 +13,15 @@ Vereins.
 | Schritt | Inhalt | |
 |---|---|---|
 | 1 | Gerüst: Ladebildschirm, Seriennummer, Updater, Kopplung, SQLite, Abgleich, Einstellungen | fertig, Ende-zu-Ende erprobt am 19.09.2026 |
-| 2 | Fachlichkeit nach Vorlage des alten Access-Programms: Artikel, Kategorien, Veranstaltungen, Verkauf, Bons, Auswertungen | offen |
+| 2 | Fachlichkeit nach Vorlage des alten Access-Programms: Veranstaltungen, Kategorien, Artikel, Verkauf, Einzelbons, Pfandrückgabe, Storno, Kassenbestand, Tagesabschluss, Bearbeiten an der Kasse, PIN | Kasse und Server fertig, Ende-zu-Ende erprobt am 29.09.2026 gegen lokalen Server, **noch nicht ausgerollt** |
+| 3 | Auswertung über alle Kassen im Adminbereich (PDF), SumUp Solo über die Cloud API | fertig, erprobt am 29.09.2026 gegen lokalen Server und nachgestellte SumUp-API — **echter Solo steht aus** |
+
+Das alte Programm (Access, `Registrierkasse2.mdb`) lag am 29.09.2026 unter
+`Downloads\Registrierkasse`. Übernommen: Tastenraster je Veranstaltung, **ein
+Bon je Stück** (Getränke, Essen, Pfand), Helfer- und Frühstücksartikel als
+normale Artikel, Ziffernblock für „Gegeben". Bewusst nicht: fest verdrahtete
+Kassennummer, flaches Journal, Auswertung mit heutigem Preis, Pfand und Helfer
+am Namen erkannt, Anmeldung mit Klartext-Passwort.
 
 ## Zwei Gegenstellen
 
@@ -41,10 +49,12 @@ Bündel — die Oberfläche lädt ihre Dateien so, wie sie im Repo liegen.
 | `utils/store.js` | lokale Datenbank (`node:sqlite`) |
 | `utils/sync.js` | wann und wie abgeglichen wird |
 | `utils/device.js` | Kassentoken, verschlüsselt über `safeStorage` |
+| `utils/pin.js` | PIN offline prüfen (PBKDF2 wie `coHashPin()` auf dem Server), Sperre nach 5 Fehlversuchen |
+| `utils/printer.js` | stiller Druck auf den Bondrucker, `public/print.html` in unsichtbarem Fenster |
 | `utils/config.js` | `config.json`, Vorgaben |
 | `utils/splash.js` | Ladebildschirm samt Abfragen, Design von Zero1 arena |
 | `utils/paths.js`, `utils/logger.js` | Datenverzeichnis, Protokoll je Tag |
-| `public/` | `index.html` (Kasse), `settings.html`, CSS, JS, Schriften, Bilder |
+| `public/` | `index.html` (Kasse: `js/app.js` Verkauf, `js/manage.js` alles hinter der PIN), `settings.html`, `print.html` + `js/print.js` + `css/print.css` (Bons), `js/sortable.min.js` (SortableJS 1.15, MIT), Schriften, Bilder |
 | `build/` | `start.js`, `release.js`, Symbole von Zero1 arena |
 | `test/` | direkt mit Electron-Node, kein Framework |
 
@@ -99,7 +109,10 @@ dort also echte Daten an.
 
 ## Die lokale Datenbank
 
-`utils/store.js`. Im Gerüst nur `meta`. Schema in `PRAGMA user_version`, umgestellt
+`utils/store.js`. Schritt 1 `meta`, Schritt 2 die Fachlichkeit: `organizers`,
+`events`, `categories`, `articles`, `sales`, `sale_items` (eine Zeile je
+Stück, Bezeichnung/Preis/Kategorie festgeschrieben), `cash`. Beträge in Cent.
+Schema in `PRAGMA user_version`, umgestellt
 Schritt für Schritt in `migrate()` — wer das Schema ändert, **hängt einen Schritt
 an**, statt einen vorhandenen zu ändern.
 
@@ -108,6 +121,45 @@ Kartenkasse: `uuid` an der Kasse vergeben, offen ist `rev > synced_rev`, ein
 Abgleich hakt nur ab, wenn `rev` beim Eintreffen der Antwort noch derselbe ist,
 Server-Stand überschreibt keine offene Zeile. **Erst den Server ausrollen, dann
 die Kasse**: Unbekannte Änderungen lehnt der Server ab, sie bleiben offen.
+
+Kategorien und Artikel ändern auch Adminbereich und andere Kassen: Sie tragen
+die `version` des Servers, die Kasse schickt sie als `base_version`. Antwortet
+der Server `conflict`, gewinnt er; `applyResults()` übernimmt `current`. Eine
+neue `version` aus `ok` gilt immer, auch wenn die Zeile inzwischen weiter
+bearbeitet wurde — sonst kollidierte die Kasse mit sich selbst.
+
+Geschäftstag (`businessDay()`): vor `day_change` der Veranstaltung (Standard
+6 Uhr) zählt zum Vortag, dieselbe Rechnung wie auf dem Server.
+
+## Die Kasse
+
+- Verkaufen geht ohne PIN. Hinter der PIN (im Adminbereich gesetzt, offline
+  geprüft): Bearbeiten, Storno, Kassenbestand, Auswertung, Veranstaltung
+  wechseln, Einstellungen. Der **Hauptprozess** prüft bei jeder geschützten
+  Aktion selbst (`unlocked()`, 5 Minuten), nicht nur die Oberfläche. Ohne
+  gesetzte PIN ist alles offen.
+- Kartenzahlung: Hat die Kasse ein SumUp-Terminal (Adminbereich, kommt mit
+  dem Abgleich in `device.terminal`), geht der Betrag über den Vereinsserver
+  ans Terminal (`api.cardStart/cardStatus/cardCancel`), gebucht wird erst bei
+  `successful`, mit der SumUp-ID als `sumup_tx`. „Von Hand" bietet die Kasse
+  nur an, wenn am Terminal sicher nichts läuft — sonst zahlte der Gast
+  doppelt. Ohne Terminal, ohne Netz oder unter 1 €: von Hand, gebucht nach
+  „Bezahlt".
+- Bildschirm: Touch-Laptops, Full-HD bei 150 % — also etwa 1280×690 CSS-Pixel.
+  Die Artikel stehen im Spaltensatz (`.product-grid`), der Editor im
+  Adminbereich (`httpdocs/admin/css/kasse.css` in tv-fridingen.de) zeigt
+  dieselben Blöcke. Wer das eine ändert, zieht das andere nach.
+
+## Drucken
+
+SEWOO SLK-TL202 (80 mm, USB) als Standarddrucker, Zettelschnitt im Treiber.
+**Ein Druckauftrag je Zettel**, damit geschnitten wird, egal ob der Treiber je
+Seite oder je Auftrag schneidet. Seitenlänge aus dem Inhalt (`renderPrint()`
+misst `#paper`, nicht das Dokument — das ist nie kleiner als das Fenster)
+plus 6 mm Luft, sonst rutschte die letzte Zeile auf einen zweiten Zettel.
+`config.printer.preview` legt PDFs unter `bons/` im Datenverzeichnis ab statt
+zu drucken — für Probeläufe. Das Druckfenster wird mit dem Kassenfenster
+geschlossen, sonst käme `window-all-closed` nie.
 
 ## Der Updater
 
@@ -175,4 +227,8 @@ Tests laufen in Electrons Node.
    (ohne `token`) auf die lokalen Server.
 5. Programm mit `--remote-debugging-port` starten und die Fenster über
    puppeteer-core steuern; es überlebt den Neustart nach dem Update.
+   Für Fachlichkeit ohne Build reicht der Quelltextbetrieb mit
+   `ZERO1_CHECKOUT_DATA_DIR`, einer `device.json` mit `"encrypted": false`
+   (Token aus `?action=pair`), `printer.preview: true` und
+   `--force-device-scale-factor=1.5`.
 6. Danach `%APPDATA%\zero1-checkout` wieder entfernen.

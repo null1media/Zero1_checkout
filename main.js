@@ -71,8 +71,10 @@ catch(e) {
 }
 
 const { Api } = require("./utils/api"),
-      { Store } = require("./utils/store"),
-      { Sync } = require("./utils/sync");
+      { Store, StoreError } = require("./utils/store"),
+      { Sync } = require("./utils/sync"),
+      { PinGuard } = require("./utils/pin"),
+      { Printer } = require("./utils/printer");
 
 let splash = null,
     mainWindow = null,
@@ -81,6 +83,7 @@ let splash = null,
     api = null,
     store = null,
     sync = null,
+    printer = null,
     quitting = false;
 
 // Fenster- und Taskleistensymbol im Null1-Design wie bei Zero1 arena. Das
@@ -502,6 +505,12 @@ function createMainWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+
+    // Das unsichtbare Druckfenster hielte das Programm sonst am Leben:
+    // window-all-closed kommt erst, wenn wirklich kein Fenster mehr offen ist.
+    if (printer) {
+      printer.close();
+    }
   });
 }
 
@@ -529,6 +538,16 @@ function openSettings() {
   });
 }
 
+// Aus dem Menü: offen, wenn entsperrt; sonst fragt die Kasse nach der PIN.
+function requestSettings() {
+  if (!store || unlocked()) {
+    openSettings();
+  }
+  else if (mainWindow) {
+    mainWindow.webContents.send("checkout:ask-settings", {});
+  }
+}
+
 function broadcast(channel, payload) {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win !== splash && !win.isDestroyed()) {
@@ -542,7 +561,7 @@ function buildMenu() {
     {
       label: "Anwendung",
       submenu: [
-        { label: "Einstellungen", accelerator: "Ctrl+,", click: () => openSettings() },
+        { label: "Einstellungen", accelerator: "Ctrl+,", click: () => requestSettings() },
         { label: "Jetzt abgleichen", accelerator: "F9", click: () => sync && sync.run() },
         { type: "separator" },
         { label: "Oberfläche neu laden", accelerator: "F5", click: () => mainWindow && mainWindow.reload() },
@@ -595,12 +614,26 @@ function registerIpc() {
 
     return { ok: result.ok, message: result.ok ? "" : result.error.message };
   });
-  ipcMain.handle("checkout:open-settings", () => openSettings());
+  // Die Einstellungen liegen hinter der PIN; ohne sie fragt die Oberfläche
+  // erst danach und ruft dann erneut.
+  ipcMain.handle("checkout:open-settings", () => {
+    if (!unlocked()) {
+      return { ok: false, locked: true };
+    }
+
+    openSettings();
+
+    return { ok: true };
+  });
   ipcMain.handle("checkout:open-path", (_event, which) => shell.openPath(which === "logs" ? logger.getLogDir() : paths.dataDir));
 
   ipcMain.handle("checkout:config", () => config);
   ipcMain.handle("checkout:config-defaults", () => require("./utils/config").DEFAULTS);
   ipcMain.handle("checkout:config-save", (_event, patch) => {
+    if (!unlocked()) {
+      return config;
+    }
+
     config = require("./utils/config").save(patch);
 
     return config;
@@ -624,6 +657,291 @@ function registerIpc() {
 
   sync.on("status", (status) => broadcast("checkout:status", status));
   sync.on("notices", (notices) => broadcast("checkout:notices", notices));
+  sync.on("synced", () => broadcast("checkout:data", {}));
+
+  registerKasseIpc();
+}
+
+/* ------------------------------------------------------------- Kasse */
+
+// Hinter der PIN: alles außer Kassieren. Entsperrt wird für eine Weile; jede
+// geschützte Aktion verlängert, "Sperren" in der Oberfläche beendet sofort.
+const UNLOCK_MS = 5 * 60 * 1000;
+
+let unlockedUntil = 0,
+    lastSaleUuid = null;
+
+const pinGuard = new PinGuard();
+
+function unlocked() {
+  const pinHash = store.settings().pin || "";
+
+  return !pinHash || Date.now() < unlockedUntil;
+}
+
+// Kontext für Bons und Belege: wer, wo, wofür.
+function printContext(event) {
+  const organizer = event ? store.organizer(event.organizer) : null;
+
+  return {
+    device: device ? device.name : "",
+    event: event ? event.name : "",
+    organizer: organizer ? organizer.name : "",
+    address: organizer ? organizer.address : "",
+    tax_number: organizer ? organizer.tax_number : "",
+    footer: event ? event.receipt_footer : "",
+    printed_at: require("./utils/store").localDateTime()
+  };
+}
+
+function registerKasseIpc() {
+  // Eine Aktion der Oberfläche: Fehler der Fachlichkeit als Meldung zurück,
+  // alles andere ins Protokoll.
+  const handle = (channel, fn, { locked = false } = {}) => ipcMain.handle(channel, async (_event, ...args) => {
+    if (locked) {
+      if (!unlocked()) {
+        return { ok: false, locked: true, message: "Bitte zuerst die PIN eingeben." };
+      }
+
+      unlockedUntil = Math.max(unlockedUntil, Date.now() + UNLOCK_MS);
+    }
+
+    try {
+      return { ok: true, ...(await fn(...args)) };
+    }
+    catch(e) {
+      if (!(e instanceof StoreError)) {
+        logger.error(`${channel}: ${e.stack || e.message}`);
+      }
+
+      return { ok: false, message: e instanceof StoreError ? e.message : "Das hat nicht geklappt. Näheres steht im Protokoll." };
+    }
+  });
+
+  // Nach jeder Änderung: bald abgleichen und alle Fenster neu zeichnen.
+  const changed = () => {
+    sync.schedule();
+    broadcast("checkout:data", {});
+  };
+
+  handle("checkout:state", () => {
+    const event = store.activeEvent(),
+          settings = store.settings(),
+          deviceInfo = store.getMeta("device") || {};
+
+    return {
+      // Das SumUp-Terminal dieser Kasse laut letztem Abgleich; null heißt:
+      // Karte von Hand ins Terminal tippen.
+      terminal: deviceInfo.terminal || null,
+      event: event ? { ...event, deposit_return: Boolean(event.deposit_return) } : null,
+      organizer: event ? store.organizer(event.organizer) : null,
+      layout: event ? store.layout(event.uuid) : { categories: [], articles: [] },
+      events: store.events().map((e) => ({ uuid: e.uuid, name: e.name, starts_on: e.starts_on, ends_on: e.ends_on })),
+      clubName: settings.club_name || "",
+      pinSet: Boolean(settings.pin),
+      unlocked: Boolean(settings.pin) && Date.now() < unlockedUntil,
+      lastSale: lastSaleUuid ? store.sale(lastSaleUuid) : null
+    };
+  });
+
+  /* Verkaufen: ohne PIN */
+
+  handle("checkout:sell", ({ items, payment, given = null, sumup_tx = null }) => {
+    const event = store.activeEvent(),
+          sale = store.createSale({ event: event && event.uuid, items, payment, given, sumup_tx });
+
+    lastSaleUuid = sale.uuid;
+    logger.info(`Verkauf ${sale.number}: ${sale.items.length} Position(en), ${(sale.total / 100).toFixed(2)} €, ${sale.payment}.`);
+    sync.schedule();
+
+    // Gedruckt wird hinter der Antwort: Die Kasse ist sofort frei für den
+    // nächsten Gast. Klemmt der Drucker, sagt es ein Hinweis.
+    printer.bons(sale, printContext(event)).then((result) => {
+      if (!result.ok) {
+        broadcast("checkout:notices", [{ uuid: sale.uuid, level: "error", message: `Bons zu Verkauf ${sale.number} nicht gedruckt. ${result.message}` }]);
+      }
+    });
+
+    return { sale };
+  });
+
+  // Der Beleg zum letzten Verkauf geht ohne PIN (der Gast steht noch da),
+  // jeder andere nur entsperrt.
+  handle("checkout:receipt", async (uuid) => {
+    if (uuid !== lastSaleUuid && !unlocked()) {
+      return { ok: false, locked: true, message: "Bitte zuerst die PIN eingeben." };
+    }
+
+    const sale = store.sale(uuid);
+
+    if (!sale) {
+      throw new StoreError("Diesen Verkauf gibt es nicht.");
+    }
+
+    return await printer.receipt(sale, printContext(store.event(sale.event)));
+  });
+
+  /* Kartenzahlung über den Vereinsserver (SumUp) */
+
+  // Fehler der Verbindung als Ergebnis, nicht als Ausnahme: Die Oberfläche
+  // entscheidet, ob es von Hand weitergeht.
+  const card = async (fn) => {
+    try {
+      return await fn();
+    }
+    catch(e) {
+      logger.warn(`Kartenzahlung: ${e.message}`);
+
+      return { ok: false, reason: e.art === "netz" ? "netz" : "server", message: e.art === "netz" ? "Der Vereinsserver ist nicht erreichbar." : e.message };
+    }
+  };
+
+  handle("checkout:card-start", async ({ amount, description }) => {
+    const result = await card(() => api.cardStart({ amount, description }));
+
+    if (result.ok) {
+      logger.info(`Kartenzahlung angestoßen: ${(amount / 100).toFixed(2)} € an ${result.terminal} (${result.payment.id}).`);
+    }
+
+    return { result };
+  });
+
+  handle("checkout:card-status", async (id) => ({ result: await card(() => api.cardStatus(id)) }));
+
+  handle("checkout:card-cancel", async (id) => {
+    const result = await card(() => api.cardCancel(id));
+
+    logger.info(`Kartenzahlung ${id} abgebrochen: ${result.ok ? result.payment.status : result.message}`);
+
+    return { result };
+  });
+
+  /* PIN */
+
+  handle("checkout:unlock", (pin) => {
+    const result = pinGuard.check(String(pin || ""), store.settings().pin || "");
+
+    if (!result.ok) {
+      throw new StoreError(result.message);
+    }
+
+    unlockedUntil = Date.now() + UNLOCK_MS;
+
+    return { unprotected: Boolean(result.unprotected) };
+  });
+
+  handle("checkout:lock", () => {
+    unlockedUntil = 0;
+
+    return {};
+  });
+
+  /* Hinter der PIN */
+
+  const locked = { locked: true };
+
+  handle("checkout:set-event", (uuid) => {
+    store.setActiveEvent(uuid);
+    logger.info(`Veranstaltung gewechselt: ${store.event(uuid).name}`);
+    broadcast("checkout:data", {});
+
+    return {};
+  }, locked);
+
+  handle("checkout:save-category", (data) => {
+    const uuid = store.saveCategory({ ...data, event: store.activeEvent().uuid });
+
+    changed();
+
+    return { uuid };
+  }, locked);
+
+  handle("checkout:delete-category", (uuid) => {
+    store.deleteCategory(uuid);
+    changed();
+
+    return {};
+  }, locked);
+
+  handle("checkout:save-article", (data) => {
+    const uuid = store.saveArticle({ ...data, event: store.activeEvent().uuid });
+
+    changed();
+
+    return { uuid };
+  }, locked);
+
+  handle("checkout:delete-article", (uuid) => {
+    store.deleteArticle(uuid);
+    changed();
+
+    return {};
+  }, locked);
+
+  handle("checkout:sold-out", (uuid, soldOut) => {
+    store.setSoldOut(uuid, soldOut);
+    changed();
+
+    return {};
+  }, locked);
+
+  handle("checkout:save-layout", (layout) => {
+    const count = store.saveLayout(store.activeEvent().uuid, layout);
+
+    if (count) {
+      changed();
+    }
+
+    return { changed: count };
+  }, locked);
+
+  handle("checkout:recent-sales", () => {
+    const event = store.activeEvent();
+
+    return { sales: event ? store.recentSales(event.uuid) : [] };
+  }, locked);
+
+  handle("checkout:cancel-sale", (uuid, reason) => {
+    const sale = store.cancelSale(uuid, reason);
+
+    logger.info(`Verkauf ${sale.number} storniert: ${reason || "ohne Grund"}`);
+    changed();
+
+    return { sale };
+  }, locked);
+
+  handle("checkout:add-cash", ({ kind, amount, note }) => {
+    const entry = store.addCash({ event: store.activeEvent() && store.activeEvent().uuid, kind, amount, note });
+
+    logger.info(`Kassenbewegung ${kind}: ${(amount / 100).toFixed(2)} €`);
+    changed();
+
+    return { entry };
+  }, locked);
+
+  handle("checkout:summary", (day = null) => {
+    const event = store.activeEvent();
+
+    if (!event) {
+      throw new StoreError("Es ist keine Veranstaltung gewählt.");
+    }
+
+    const days = store.businessDays(event.uuid),
+          chosen = day || days[0] || require("./utils/store").businessDay(require("./utils/store").localDateTime(), event.day_change);
+
+    return { days, summary: store.daySummary(event.uuid, chosen) };
+  }, locked);
+
+  handle("checkout:print-summary", async (day) => {
+    const event = store.activeEvent();
+
+    return await printer.summary(store.daySummary(event.uuid, day), printContext(event));
+  }, locked);
+
+  /* Einstellungen: Drucker */
+
+  handle("checkout:printers", async () => ({ printers: await printer.list(mainWindow ? mainWindow.webContents : BrowserWindow.getAllWindows()[0].webContents) }));
+  handle("checkout:print-test", async () => await printer.test(printContext(store.activeEvent())));
 }
 
 /* --------------------------------------------------------------- Start */
@@ -724,6 +1042,8 @@ ${paths.database}`);
 
     return;
   }
+
+  printer = new Printer({ logger, getConfig: () => config, dataDir: paths.dataDir });
 
   registerIpc();
   sync.start();

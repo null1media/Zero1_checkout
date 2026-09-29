@@ -15,7 +15,7 @@
       <header class="topbar">
         <div class="brand">
           <img src="img/tv-fridingen.png" alt="">
-          <h1>Kasse<small id="club">Turnverein 1905 Fridingen e. V.</small></h1>
+          <h1><span id="event-name">Kasse</span><small id="club">Turnverein 1905 Fridingen e. V.</small></h1>
         </div>
         <span id="device" class="device" hidden></span>
         <div class="spacer"></div>
@@ -24,7 +24,7 @@
           <span id="sync-text">Wird geladen…</span>
           <span id="sync-pending" class="pending" hidden></span>
         </button>
-        <button id="open-settings" class="icon-button" type="button" title="Einstellungen (Strg+,)"><i class="fas fa-cog"></i></button>
+        <button id="open-manage" class="icon-button" type="button" title="Verwaltung (PIN)"><i class="fas fa-lock"></i></button>
       </header>
 
       <div id="banner" class="banner" hidden>
@@ -32,14 +32,61 @@
         <button id="banner-action" class="btn-kasse quiet" type="button">Einstellungen öffnen</button>
       </div>
 
+      <div id="edit-bar" class="edit-bar" hidden>
+        <i class="fas fa-pen-to-square"></i>
+        <span><b>Bearbeiten.</b> Tasten und Kategorien ziehen zum Anordnen, antippen zum Ändern. Änderungen gehen beim nächsten Abgleich an den Verein.</span>
+        <span class="spacer"></span>
+        <button id="add-category" class="btn-kasse quiet" type="button"><i class="fas fa-plus"></i>Kategorie</button>
+        <button id="edit-done" class="btn-kasse" type="button"><i class="fas fa-check"></i>Fertig</button>
+      </div>
+
       <main class="workspace">
-        <div class="panel">
-          <div class="empty-state">
-            <img src="img/tv-fridingen.png" alt="">
-            <h2>Die Kasse ist bereit</h2>
-            <p>Artikel, Veranstaltungen und der Verkauf folgen im nächsten Schritt. Kopplung, Abgleich und Aktualisierung laufen bereits.</p>
+        <section id="products" class="products" aria-label="Artikel"><div id="product-grid" class="product-grid"></div></section>
+
+        <aside class="till" aria-label="Bon">
+          <div id="last-sale" class="last-sale" hidden></div>
+          <ul id="bon" class="bon"></ul>
+
+          <div class="totals">
+            <div class="total-row">
+              <span>Summe</span>
+              <strong id="total">0,00 €</strong>
+            </div>
+            <div class="given-row">
+              <span>Gegeben <b id="given">–</b></span>
+              <span>Zurück <b id="change">–</b></span>
+            </div>
           </div>
-        </div>
+
+          <div class="keypad" id="keypad">
+            <button type="button" data-key="7">7</button>
+            <button type="button" data-key="8">8</button>
+            <button type="button" data-key="9">9</button>
+            <button type="button" class="quick" data-quick="500">5 €</button>
+            <button type="button" data-key="4">4</button>
+            <button type="button" data-key="5">5</button>
+            <button type="button" data-key="6">6</button>
+            <button type="button" class="quick" data-quick="1000">10 €</button>
+            <button type="button" data-key="1">1</button>
+            <button type="button" data-key="2">2</button>
+            <button type="button" data-key="3">3</button>
+            <button type="button" class="quick" data-quick="2000">20 €</button>
+            <button type="button" data-key="0">0</button>
+            <button type="button" data-key="00">00</button>
+            <button type="button" data-key=",">,</button>
+            <button type="button" class="quick" data-quick="5000">50 €</button>
+          </div>
+
+          <div class="actions">
+            <button id="clear" class="btn-kasse quiet" type="button" title="Bon leeren (Entf)"><i class="fas fa-xmark"></i>Leeren</button>
+            <button id="clear-given" class="btn-kasse quiet" type="button" title="Gegeben löschen"><i class="fas fa-backspace"></i>Gegeben</button>
+            <button id="deposit-return" class="btn-kasse quiet" type="button" hidden><i class="fas fa-recycle"></i>Pfand zurück</button>
+          </div>
+          <div class="pay">
+            <button id="pay-cash" class="btn-kasse pay-button" type="button" title="Bar kassieren (Enter)"><i class="fas fa-coins"></i><span id="pay-cash-label">Bar</span></button>
+            <button id="pay-card" class="btn-kasse pay-button card" type="button"><i class="fas fa-credit-card"></i>Karte</button>
+          </div>
+        </aside>
       </main>
 
       <footer class="footer">
@@ -51,7 +98,9 @@
 
     <div id="toasts" class="toasts"></div>
 
+    <script src="js/sortable.min.js"></script>
     <script src="js/common.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/manage.js"></script>
   </body>
 </html>

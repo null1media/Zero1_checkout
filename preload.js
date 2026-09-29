@@ -25,5 +25,37 @@ contextBridge.exposeInMainWorld("checkout", {
   openSettings: () => ipcRenderer.invoke("checkout:open-settings"),
   openPath: (which) => ipcRenderer.invoke("checkout:open-path", which),
   onStatus: (callback) => on("checkout:status", callback),
-  onNotices: (callback) => on("checkout:notices", callback)
+  onNotices: (callback) => on("checkout:notices", callback),
+  onData: (callback) => on("checkout:data", callback),
+  onAskSettings: (callback) => on("checkout:ask-settings", callback),
+
+  // Kassieren
+  state: () => ipcRenderer.invoke("checkout:state"),
+  sell: (sale) => ipcRenderer.invoke("checkout:sell", sale),
+  receipt: (uuid) => ipcRenderer.invoke("checkout:receipt", uuid),
+  cardStart: (payment) => ipcRenderer.invoke("checkout:card-start", payment),
+  cardStatus: (id) => ipcRenderer.invoke("checkout:card-status", id),
+  cardCancel: (id) => ipcRenderer.invoke("checkout:card-cancel", id),
+
+  // PIN
+  unlock: (pin) => ipcRenderer.invoke("checkout:unlock", pin),
+  lock: () => ipcRenderer.invoke("checkout:lock"),
+
+  // Hinter der PIN
+  setEvent: (uuid) => ipcRenderer.invoke("checkout:set-event", uuid),
+  saveCategory: (data) => ipcRenderer.invoke("checkout:save-category", data),
+  deleteCategory: (uuid) => ipcRenderer.invoke("checkout:delete-category", uuid),
+  saveArticle: (data) => ipcRenderer.invoke("checkout:save-article", data),
+  deleteArticle: (uuid) => ipcRenderer.invoke("checkout:delete-article", uuid),
+  soldOut: (uuid, soldOut) => ipcRenderer.invoke("checkout:sold-out", uuid, soldOut),
+  saveLayout: (layout) => ipcRenderer.invoke("checkout:save-layout", layout),
+  recentSales: () => ipcRenderer.invoke("checkout:recent-sales"),
+  cancelSale: (uuid, reason) => ipcRenderer.invoke("checkout:cancel-sale", uuid, reason),
+  addCash: (entry) => ipcRenderer.invoke("checkout:add-cash", entry),
+  summary: (day) => ipcRenderer.invoke("checkout:summary", day),
+  printSummary: (day) => ipcRenderer.invoke("checkout:print-summary", day),
+
+  // Einstellungen
+  printers: () => ipcRenderer.invoke("checkout:printers"),
+  printTest: () => ipcRenderer.invoke("checkout:print-test")
 });

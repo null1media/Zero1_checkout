@@ -5,6 +5,8 @@
 //
 //   POST index.php?action=pair   Kopplungscode gegen Token
 //   POST index.php?action=sync   Änderungen einspielen, Bestand holen
+//   POST index.php?action=card_start / card_status / card_cancel
+//                                 Kartenzahlung am SumUp-Terminal der Kasse
 //
 // Aktualisierungen laufen nicht hierüber, sondern wie bei Zero1 arena über
 // checkout.null1.media (utils/updater.js).
@@ -116,6 +118,20 @@ class Api {
 
   sync({ since, changes }, timeoutMs) {
     return this.request("index.php?action=sync", { method: "POST", body: { since, changes }, timeoutMs });
+  }
+
+  // Kartenzahlung: Der Vereinsserver spricht mit SumUp, die Kasse nur mit
+  // ihm. Kurze Wartezeiten — an der Kasse steht ein Gast.
+  cardStart({ amount, description }) {
+    return this.request("index.php?action=card_start", { method: "POST", body: { amount, description }, timeoutMs: 20000 });
+  }
+
+  cardStatus(id) {
+    return this.request("index.php?action=card_status", { method: "POST", body: { id }, timeoutMs: 8000 });
+  }
+
+  cardCancel(id) {
+    return this.request("index.php?action=card_cancel", { method: "POST", body: { id }, timeoutMs: 15000 });
   }
 }
 

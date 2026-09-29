@@ -146,3 +146,272 @@ function toast(message, level = "info", ms = 6000) {
   box.appendChild(el);
   setTimeout(() => el.remove(), ms);
 }
+
+/* ------------------------------------------------------------ Beträge */
+
+// Cent -> "2,50 €"
+function euro(cents) {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format((Number(cents) || 0) / 100);
+}
+
+// "2,5" / "2.50" / "20" -> Cent, sonst null
+function parseCents(text) {
+  const value = String(text ?? "").replace(/[€\s]/g, "").replace(",", ".");
+
+  if (!/^\d{1,6}(\.\d{0,2})?$/.test(value)) {
+    return null;
+  }
+
+  return Math.round(parseFloat(value) * 100);
+}
+
+/*
+  Ein Formular als Dialog, Antwort als Promise: { value, data } mit data als
+  Objekt der Feldwerte.
+
+    formDialog({ title, text, fields: [
+      { name, label, type: "text" | "money" | "select" | "toggle" | "color", value, options, hint }
+    ], buttons: [{ label, value, kind }], validate: (data) => "Fehlertext" | null })
+
+  Wie dialog(): Enter wählt den ersten Knopf, Esc den letzten. Geprüft wird
+  nur vor dem ersten Knopf, der Hauptaktion.
+*/
+const COLORS = ["#c32229", "#e07b00", "#c9a100", "#2e8b57", "#138086", "#1f6fb2", "#5b4fa0", "#a0407b", "#8d5b3a", "#6c757d"];
+
+function formDialog({ title, text = "", fields, buttons, validate = null }) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+
+    const fieldHtml = (f) => {
+      const id = `f-${f.name}`;
+
+      if (f.type === "toggle") {
+        return `<label class="toggle"><input type="checkbox" name="${f.name}"${f.value ? " checked" : ""}><span class="knob"></span><span>${escapeHtml(f.label)}${f.hint ? `<small>${escapeHtml(f.hint)}</small>` : ""}</span></label>`;
+      }
+
+      if (f.type === "select") {
+        return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label><select id="${id}" name="${f.name}">${f.options.map((o) => `<option value="${escapeHtml(o.value)}"${o.value === f.value ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("")}</select></div>`;
+      }
+
+      if (f.type === "color") {
+        return `<div class="field"><label>${escapeHtml(f.label)}</label><div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch${c === f.value ? " active" : ""}" data-color="${c}" title="${c}"></button>`).join("")}</div><input type="hidden" name="${f.name}" value="${escapeHtml(f.value || COLORS[0])}"></div>`;
+      }
+
+      return `<div class="field"><label for="${id}">${escapeHtml(f.label)}</label><input id="${id}" name="${f.name}" type="text" spellcheck="false" autocomplete="off"${f.type === "money" ? ' inputmode="decimal"' : ""} value="${escapeHtml(f.value ?? "")}">${f.hint ? `<small>${escapeHtml(f.hint)}</small>` : ""}</div>`;
+    };
+
+    backdrop.className = "dialog-backdrop";
+    backdrop.innerHTML = `
+      <form class="dialog-kasse" role="dialog" aria-modal="true" novalidate>
+        <h3>${escapeHtml(title)}</h3>
+        ${text ? `<p>${escapeHtml(text)}</p>` : ""}
+        ${fields.map(fieldHtml).join("")}
+        <div class="message error" hidden></div>
+        <div class="buttons">
+          ${buttons.map((b, i) => `<button type="button" class="btn-kasse ${b.kind || ""}" data-i="${i}">${escapeHtml(b.label)}</button>`).join("")}
+        </div>
+      </form>`;
+
+    // Farben ohne style-Attribut: Die CSP erlaubt keine Inline-Stile im
+    // Markup, gesetzt über das DOM geht.
+    backdrop.querySelectorAll(".swatch").forEach((s) => s.style.setProperty("--swatch", s.dataset.color));
+
+    const form = backdrop.querySelector("form"),
+          message = backdrop.querySelector(".message");
+
+    const read = () => Object.fromEntries(fields.map((f) => {
+      const el = form.elements[f.name];
+
+      return [f.name, f.type === "toggle" ? el.checked : el.value];
+    }));
+
+    const finish = (index) => {
+      if (index === 0 && validate) {
+        const problem = validate(read());
+
+        if (problem) {
+          message.hidden = false;
+          message.textContent = problem;
+
+          return;
+        }
+      }
+
+      document.removeEventListener("keydown", onKey, true);
+      backdrop.remove();
+      resolve({ value: buttons[index].value, data: read() });
+    };
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(buttons.length - 1);
+      }
+      else if (e.key === "Enter" && e.target.tagName !== "BUTTON") {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(0);
+      }
+    };
+
+    backdrop.addEventListener("click", (e) => {
+      const swatch = e.target.closest(".swatch"),
+            button = e.target.closest("button[data-i]");
+
+      if (swatch) {
+        backdrop.querySelectorAll(".swatch").forEach((s) => s.classList.toggle("active", s === swatch));
+        swatch.closest(".field").querySelector("input").value = swatch.dataset.color;
+      }
+      else if (button) {
+        finish(Number(button.dataset.i));
+      }
+    });
+
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(backdrop);
+
+    const first = form.querySelector("input[type=text], select");
+
+    if (first) {
+      first.focus();
+
+      if (first.select) {
+        first.select();
+      }
+    }
+  });
+}
+
+/*
+  Ziffernblock als Dialog — für die PIN und für Beträge, mit dem Finger
+  bedienbar. Rückgabe: die Eingabe als Zeichenkette oder null.
+
+    padDialog({ title, text, mode: "pin" | "amount", confirm, check: async (value) => "Fehler" | null, extra })
+
+  check läuft vor dem Schließen; liefert es einen Text, bleibt der Dialog
+  offen und zeigt ihn (falsche PIN, Betrag fehlt). extra ist zusätzliches
+  Markup über der Anzeige, etwa eine Auswahl.
+*/
+function padDialog({ title, text = "", mode = "amount", confirm = "OK", check = null, extra = "" }) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    let value = "";
+
+    backdrop.className = "dialog-backdrop";
+    backdrop.innerHTML = `
+      <div class="dialog-kasse pad-dialog" role="dialog" aria-modal="true">
+        <h3>${escapeHtml(title)}</h3>
+        ${text ? `<p>${escapeHtml(text)}</p>` : ""}
+        ${extra}
+        <div class="pad-display ${mode}"></div>
+        <div class="message error" hidden></div>
+        <div class="pad-keys">
+          ${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((k) => `<button type="button" data-key="${k}">${k}</button>`).join("")}
+          <button type="button" data-key="${mode === "pin" ? "clear" : ","}">${mode === "pin" ? '<i class="fas fa-xmark"></i>' : ","}</button>
+          <button type="button" data-key="0">0</button>
+          <button type="button" data-key="back"><i class="fas fa-backspace"></i></button>
+        </div>
+        <div class="buttons">
+          <button type="button" class="btn-kasse" data-action="ok">${escapeHtml(confirm)}</button>
+          <button type="button" class="btn-kasse quiet" data-action="cancel">Abbrechen</button>
+        </div>
+      </div>`;
+
+    const display = backdrop.querySelector(".pad-display"),
+          message = backdrop.querySelector(".message");
+
+    const draw = () => {
+      display.textContent = mode === "pin" ? ("•".repeat(value.length) || " ") : `${value || "0"} €`;
+    };
+
+    const press = (key) => {
+      message.hidden = true;
+
+      if (key === "back") {
+        value = value.slice(0, -1);
+      }
+      else if (key === "clear") {
+        value = "";
+      }
+      else if (key === ",") {
+        if (!value.includes(",")) {
+          value = (value || "0") + ",";
+        }
+      }
+      else if (mode === "pin" ? value.length < 8 : !/,\d\d$/.test(value) && value.replace(",", "").length < 7) {
+        value += key;
+      }
+
+      draw();
+    };
+
+    const close = (result) => {
+      document.removeEventListener("keydown", onKey, true);
+      backdrop.remove();
+      resolve(result);
+    };
+
+    const submit = async () => {
+      if (check) {
+        const problem = await check(value, backdrop);
+
+        if (problem) {
+          message.hidden = false;
+          message.textContent = problem;
+
+          if (mode === "pin") {
+            value = "";
+            draw();
+          }
+
+          return;
+        }
+      }
+
+      close(value);
+    };
+
+    const onKey = (e) => {
+      if (/^\d$/.test(e.key) || e.key === ",") {
+        press(e.key);
+      }
+      else if (e.key === "Backspace") {
+        press("back");
+      }
+      else if (e.key === "Enter") {
+        submit();
+      }
+      else if (e.key === "Escape") {
+        close(null);
+      }
+      else {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    backdrop.addEventListener("click", (e) => {
+      const key = e.target.closest("[data-key]"),
+            action = e.target.closest("[data-action]");
+
+      if (key) {
+        press(key.dataset.key);
+      }
+      else if (action) {
+        if (action.dataset.action === "ok") {
+          submit();
+        }
+        else {
+          close(null);
+        }
+      }
+    });
+
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(backdrop);
+    draw();
+  });
+}
