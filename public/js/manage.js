@@ -392,21 +392,38 @@ async function openSales() {
       <td>${s.payment === "karte" ? "Karte" : "bar"}</td>
       <td class="num">${euro(s.total)}</td>
       <td class="actions-cell">
+        ${!s.cancelled_at && s.items.some((i) => i.kind !== "pfandrueckgabe") ? `<button type="button" class="btn-kasse quiet" data-bons="${s.uuid}" data-number="${s.number}"><i class="fas fa-ticket"></i>Bons</button>` : ""}
         <button type="button" class="btn-kasse quiet" data-receipt="${s.uuid}"><i class="fas fa-receipt"></i>Beleg</button>
         ${s.cancelled_at ? `<span class="tag">storniert ${time(s.cancelled_at)}</span>` : `<button type="button" class="btn-kasse danger" data-cancel="${s.uuid}" data-number="${s.number}"><i class="fas fa-rotate-left"></i>Storno</button>`}
       </td>
     </tr>`).join("");
 
   const el = openOverlay("Storno & Belege", result.sales.length
-    ? `<p class="lead-text">Die letzten Verkäufe dieser Kasse. Ein Storno nimmt den ganzen Verkauf aus der Auswertung; das Geld geht bar zurück, bei Karte über das SumUp-Terminal.</p>
+    ? `<p class="lead-text">Die letzten Verkäufe dieser Kasse. „Bons“ druckt die Bons eines Verkaufs noch einmal, gekennzeichnet als Nachdruck. Ein Storno nimmt den ganzen Verkauf aus der Auswertung; das Geld geht bar zurück, bei Karte über das SumUp-Terminal.</p>
        <table class="table-kasse"><thead><tr><th class="num">Bon</th><th>Zeit</th><th>Artikel</th><th>Zahlung</th><th class="num">Summe</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
     : '<p class="lead-text">An dieser Kasse wurde für diese Veranstaltung noch nichts verkauft.</p>');
 
   el.addEventListener("click", async (e) => {
     const receipt = e.target.closest("[data-receipt]"),
+          bons = e.target.closest("[data-bons]"),
           cancel = e.target.closest("[data-cancel]");
 
-    if (receipt) {
+    if (bons) {
+      const ok = await dialog({
+        title: `Bons zu Bon ${bons.dataset.number} nachdrucken`,
+        text: "Nur, wenn die Bons nicht herausgekommen sind (Drucker, Absturz). Jeder nachgedruckte Bon trägt „Nachdruck“.",
+        buttons: [{ label: "Nachdrucken", value: true }, { label: "Abbrechen", value: false, kind: "quiet" }]
+      });
+
+      if (ok) {
+        const r = await guarded(() => window.checkout.reprintBons(bons.dataset.bons));
+
+        if (r.ok) {
+          toast("Die Bons werden gedruckt.", "ok");
+        }
+      }
+    }
+    else if (receipt) {
       const r = await guarded(() => window.checkout.receipt(receipt.dataset.receipt));
 
       if (r.ok) {

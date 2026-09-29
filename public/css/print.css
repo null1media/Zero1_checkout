@@ -78,6 +78,13 @@ body {
   text-transform: uppercase;
 }
 
+/* Ohne Hintergrund: Der Druck läuft mit printBackground: false. */
+.bon-reprint {
+  border-width: 2px;
+  font-size: 11pt;
+  letter-spacing: 1pt;
+}
+
 .meta {
   margin-top: 4mm;
   padding-top: 2mm;

@@ -145,6 +145,14 @@ Geschäftstag (`businessDay()`): vor `day_change` der Veranstaltung (Standard
   nur an, wenn am Terminal sicher nichts läuft — sonst zahlte der Gast
   doppelt. Ohne Terminal, ohne Netz oder unter 1 €: von Hand, gebucht nach
   „Bezahlt".
+- **Absturz mitten in der Kartenzahlung**: Beim Anstoßen bepreist der
+  Hauptprozess den Bon (`store.quote()`, Betrag muss passen) und merkt ihn
+  samt SumUp-ID in `meta.card_pending`. Jede Terminal-Antwort schreibt den
+  Stand nach, gebucht wird nur daraus (`checkout:card-book`), zum Preis beim
+  Anstoßen. Nach dem Neustart und nach jedem Abgleich fragt die Oberfläche
+  nach (`resumeCard()`). Eine zweite Buchung mit derselben SumUp-ID liefert
+  den ersten Verkauf. Eine bezahlte, ungebuchte Zahlung sperrt neue
+  Kartenzahlungen, bis sie gebucht ist.
 - Bildschirm: Touch-Laptops, Full-HD bei 150 % — also etwa 1280×690 CSS-Pixel.
   Die Artikel stehen im Spaltensatz (`.product-grid`), der Editor im
   Adminbereich (`httpdocs/admin/css/kasse.css` in tv-fridingen.de) zeigt
@@ -157,7 +165,10 @@ SEWOO SLK-TL202 (80 mm, USB) als Standarddrucker, Zettelschnitt im Treiber.
 Seite oder je Auftrag schneidet. Seitenlänge aus dem Inhalt (`renderPrint()`
 misst `#paper`, nicht das Dokument — das ist nie kleiner als das Fenster)
 plus 6 mm Luft, sonst rutschte die letzte Zeile auf einen zweiten Zettel.
-`config.printer.preview` legt PDFs unter `bons/` im Datenverzeichnis ab statt
+Klemmt der Druck oder stürzt die Kasse zwischen Buchen und Drucken ab:
+„Bons" unter Storno & Belege (hinter der PIN) druckt nach, jeder Zettel
+trägt **Nachdruck** (Rahmen, kein Hintergrund — gedruckt wird mit
+`printBackground: false`). `config.printer.preview` legt PDFs unter `bons/` im Datenverzeichnis ab statt
 zu drucken — für Probeläufe. Das Druckfenster wird mit dem Kassenfenster
 geschlossen, sonst käme `window-all-closed` nie.
 

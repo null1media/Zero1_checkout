@@ -42,13 +42,15 @@ function head(doc) {
 }
 
 // Ein Stück, ein Zettel — wie im alten Programm: Die Ausgabe nimmt den Bon
-// entgegen und gibt dafür genau diesen Artikel heraus.
+// entgegen und gibt dafür genau diesen Artikel heraus. Ein Nachdruck sagt es:
+// Die Ausgabe soll sehen, wenn derselbe Bon zweimal kommt.
 function bon(doc) {
   return `
     ${head(doc)}
     <div class="bon-article">${esc(doc.name)}</div>
     <div class="bon-price">${esc(euro(doc.price))}</div>
     ${doc.deposit ? '<span class="bon-tag">Pfand</span>' : ""}
+    ${doc.reprint ? '<span class="bon-tag bon-reprint">Nachdruck</span>' : ""}
     <div class="meta">Bon ${esc(doc.number)} · ${esc(doc.index)}/${esc(doc.count)} · ${esc(doc.device || "")} · ${esc(when(doc.created_at))}</div>
     ${doc.footer ? `<div class="footer">${esc(doc.footer)}</div>` : ""}`;
 }

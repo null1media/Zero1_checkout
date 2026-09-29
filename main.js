@@ -35,11 +35,6 @@ const { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } = requir
 
 const PRODUCT = "Zero1 checkout";
 
-// Nur eine Instanz. Zwei Kopien schrieben gleichzeitig in dieselbe Datenbank.
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-}
-
 app.setName(PRODUCT);
 
 // Das Datenverzeichnis fest benennen, statt es aus dem Namen ableiten zu
@@ -53,6 +48,14 @@ app.setName(PRODUCT);
 app.setPath("userData", !app.isPackaged && process.env.ZERO1_CHECKOUT_DATA_DIR
   ? path.resolve(process.env.ZERO1_CHECKOUT_DATA_DIR)
   : path.join(app.getPath("appData"), "zero1-checkout"));
+
+// Nur eine Instanz. Zwei Kopien schrieben gleichzeitig in dieselbe Datenbank.
+// Die Sperre gilt je Datenverzeichnis, deshalb erst nach setPath: Ein
+// Probelauf mit ZERO1_CHECKOUT_DATA_DIR darf neben der installierten Kasse
+// laufen, zwei Kassen auf denselben Daten nicht.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
 
 const paths = require("./utils/paths"),
       logger = require("./utils/logger"),
@@ -746,23 +749,30 @@ function registerKasseIpc() {
 
   /* Verkaufen: ohne PIN */
 
-  handle("checkout:sell", ({ items, payment, given = null, sumup_tx = null }) => {
-    const event = store.activeEvent(),
-          sale = store.createSale({ event: event && event.uuid, items, payment, given, sumup_tx });
-
-    lastSaleUuid = sale.uuid;
-    logger.info(`Verkauf ${sale.number}: ${sale.items.length} Position(en), ${(sale.total / 100).toFixed(2)} €, ${sale.payment}.`);
-    sync.schedule();
-
-    // Gedruckt wird hinter der Antwort: Die Kasse ist sofort frei für den
-    // nächsten Gast. Klemmt der Drucker, sagt es ein Hinweis.
-    printer.bons(sale, printContext(event)).then((result) => {
+  // Gedruckt wird hinter der Antwort: Die Kasse ist sofort frei für den
+  // nächsten Gast. Klemmt der Drucker, sagt es ein Hinweis.
+  const printBons = (sale) => {
+    printer.bons(sale, printContext(store.event(sale.event))).then((result) => {
       if (!result.ok) {
-        broadcast("checkout:notices", [{ uuid: sale.uuid, level: "error", message: `Bons zu Verkauf ${sale.number} nicht gedruckt. ${result.message}` }]);
+        broadcast("checkout:notices", [{ uuid: sale.uuid, level: "druck", message: `Bons zu Verkauf ${sale.number} nicht gedruckt. ${result.message} Nachdruck unter „Storno & Belege“.` }]);
       }
     });
+  };
+
+  const booked = (sale) => {
+    lastSaleUuid = sale.uuid;
+    logger.info(`Verkauf ${sale.number}: ${sale.items.length} Position(en), ${(sale.total / 100).toFixed(2)} €, ${sale.payment}${sale.sumup_tx ? ` (${sale.sumup_tx})` : ""}.`);
+    sync.schedule();
+    printBons(sale);
 
     return { sale };
+  };
+
+  // Bar und Karte von Hand. Über das Terminal bucht checkout:card-book.
+  handle("checkout:sell", ({ items, payment, given = null }) => {
+    const event = store.activeEvent();
+
+    return booked(store.createSale({ event: event && event.uuid, items, payment, given }));
   });
 
   // Der Beleg zum letzten Verkauf geht ohne PIN (der Gast steht noch da),
@@ -796,24 +806,102 @@ function registerKasseIpc() {
     }
   };
 
-  handle("checkout:card-start", async ({ amount, description }) => {
+  /*
+    Die laufende Zahlung steht ab dem Anstoßen in der Datenbank
+    (store.cardPending), mit dem Bon, wie er in diesem Augenblick bepreist
+    ist. Jede Antwort des Terminals schreibt den Stand nach; abgelehnt oder
+    abgebrochen räumt sie weg, gebucht wird aus dem Gemerkten. So übersteht
+    eine Zahlung auch einen Absturz der Kasse mitten darin — die Oberfläche
+    fragt nach dem Neustart weiter (checkout:card-pending).
+  */
+  const noteCard = (result) => {
+    const pending = store.cardPending();
+
+    if (!result.ok || !pending || pending.id !== result.payment.id) {
+      return;
+    }
+
+    if (result.payment.status === "successful") {
+      store.setCardPending({ ...pending, status: "successful" });
+    }
+    else if (result.payment.status !== "pending") {
+      store.clearCardPending(pending.id);
+    }
+  };
+
+  handle("checkout:card-start", async ({ amount, description, items }) => {
+    const event = store.activeEvent(),
+          quote = store.quote(event && event.uuid, items);
+
+    // Der Betrag am Terminal ist der, den die Kasse bucht — nicht der, den
+    // die Oberfläche errechnet hat.
+    if (quote.total !== amount) {
+      return { result: { ok: false, reason: "server", message: "Der Betrag passt nicht mehr zum Bon. Bitte den Bon prüfen und erneut kassieren." } };
+    }
+
+    const open = store.cardPending();
+
+    // Eine bezahlte, noch nicht gebuchte Zahlung zuerst buchen; eine neue
+    // überschriebe sie.
+    if (open && open.status === "successful") {
+      return { result: { ok: false, reason: "unbooked", message: "Eine frühere Kartenzahlung ist bezahlt, aber noch nicht gebucht." } };
+    }
+
     const result = await card(() => api.cardStart({ amount, description }));
 
     if (result.ok) {
+      store.setCardPending({ id: result.payment.id, ...quote, terminal: result.terminal, started_at: require("./utils/store").localDateTime(), status: result.payment.status });
+      noteCard(result);
       logger.info(`Kartenzahlung angestoßen: ${(amount / 100).toFixed(2)} € an ${result.terminal} (${result.payment.id}).`);
     }
 
     return { result };
   });
 
-  handle("checkout:card-status", async (id) => ({ result: await card(() => api.cardStatus(id)) }));
+  handle("checkout:card-status", async (id) => {
+    const result = await card(() => api.cardStatus(id));
+
+    noteCard(result);
+
+    return { result };
+  });
 
   handle("checkout:card-cancel", async (id) => {
     const result = await card(() => api.cardCancel(id));
 
+    noteCard(result);
     logger.info(`Kartenzahlung ${id} abgebrochen: ${result.ok ? result.payment.status : result.message}`);
 
     return { result };
+  });
+
+  handle("checkout:card-pending", () => {
+    const pending = store.cardPending();
+
+    return { pending: pending ? { id: pending.id, total: pending.total, terminal: pending.terminal, started_at: pending.started_at, status: pending.status } : null };
+  });
+
+  // Buchen, was am Terminal bezahlt ist. Nur, wenn die Antwort des Terminals
+  // hier angekommen ist — die Oberfläche allein kann das nicht auslösen.
+  // Zweimal gebucht wird nichts: createSale erkennt die SumUp-ID.
+  handle("checkout:card-book", (id) => {
+    const pending = store.cardPending();
+
+    if (!pending || pending.id !== id) {
+      const sale = store.get("SELECT uuid FROM sales WHERE sumup_tx = ?", String(id));
+
+      if (sale) {
+        return { sale: store.sale(sale.uuid) };
+      }
+
+      throw new StoreError("Diese Kartenzahlung ist der Kasse nicht bekannt.");
+    }
+
+    if (pending.status !== "successful") {
+      throw new StoreError("Die Kartenzahlung ist noch nicht als bezahlt gemeldet.");
+    }
+
+    return booked(store.createSale({ event: pending.event, lines: pending.lines, payment: "karte", sumup_tx: pending.id }));
   });
 
   /* PIN */
@@ -899,6 +987,24 @@ function registerKasseIpc() {
     const event = store.activeEvent();
 
     return { sales: event ? store.recentSales(event.uuid) : [] };
+  }, locked);
+
+  // Nachdruck, wenn die Bons nicht herauskamen (Drucker, Absturz). Hinter der
+  // PIN: Ein Bon ist Ware wert. Jeder Nachdruck steht im Protokoll.
+  handle("checkout:reprint-bons", async (uuid) => {
+    const sale = store.sale(uuid);
+
+    if (!sale) {
+      throw new StoreError("Diesen Verkauf gibt es nicht.");
+    }
+
+    if (sale.cancelled_at) {
+      throw new StoreError(`Bon ${sale.number} ist storniert.`);
+    }
+
+    logger.info(`Bons zu Verkauf ${sale.number} nachgedruckt.`);
+
+    return await printer.bons(sale, { ...printContext(store.event(sale.event)), reprint: true });
   }, locked);
 
   handle("checkout:cancel-sale", (uuid, reason) => {

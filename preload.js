@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("checkout", {
   cardStart: (payment) => ipcRenderer.invoke("checkout:card-start", payment),
   cardStatus: (id) => ipcRenderer.invoke("checkout:card-status", id),
   cardCancel: (id) => ipcRenderer.invoke("checkout:card-cancel", id),
+  cardPending: () => ipcRenderer.invoke("checkout:card-pending"),
+  cardBook: (id) => ipcRenderer.invoke("checkout:card-book", id),
 
   // PIN
   unlock: (pin) => ipcRenderer.invoke("checkout:unlock", pin),
@@ -50,6 +52,7 @@ contextBridge.exposeInMainWorld("checkout", {
   soldOut: (uuid, soldOut) => ipcRenderer.invoke("checkout:sold-out", uuid, soldOut),
   saveLayout: (layout) => ipcRenderer.invoke("checkout:save-layout", layout),
   recentSales: () => ipcRenderer.invoke("checkout:recent-sales"),
+  reprintBons: (uuid) => ipcRenderer.invoke("checkout:reprint-bons", uuid),
   cancelSale: (uuid, reason) => ipcRenderer.invoke("checkout:cancel-sale", uuid, reason),
   addCash: (entry) => ipcRenderer.invoke("checkout:add-cash", entry),
   summary: (day) => ipcRenderer.invoke("checkout:summary", day),

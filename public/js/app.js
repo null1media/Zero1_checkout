@@ -324,15 +324,20 @@ async function sell(payment, extra = {}) {
       return;
     }
 
-    kasse.state.lastSale = result.sale;
-    kasse.bon = [];
-    kasse.given = "";
-    renderLastSale();
-    renderBon();
+    settled(result.sale);
   }
   finally {
     kasse.busy = false;
   }
+}
+
+// Gebucht: Der Bon ist erledigt, groß steht, was zurückzugeben ist.
+function settled(sale) {
+  kasse.state.lastSale = sale;
+  kasse.bon = [];
+  kasse.given = "";
+  renderLastSale();
+  renderBon();
 }
 
 $("pay-cash").addEventListener("click", () => sell("bar"));
@@ -412,15 +417,103 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // weiter gewartet werden soll.
 const CARD_PATIENCE_MS = 150000;
 
+/*
+  Nachfragen, bis das Terminal ein Ergebnis hat. Kein "Von Hand", solange
+  die Zahlung dort noch laufen könnte — sonst zahlte der Gast doppelt.
+  Mit later darf die Kasse das Nachfragen vertagen (nach einem Neustart,
+  wenn der Server nicht antwortet); dann liefert es null.
+*/
+async function watchPayment(box, id, payment, { later = false } = {}) {
+  const since = Date.now(),
+        buttons = [{ label: "Abbrechen", value: "cancel", kind: "quiet" }, ...(later ? [{ label: "Später", value: "later", kind: "quiet" }] : [])];
+
+  let cancelling = false,
+      postpone = false,
+      waitMore = false;
+
+  const pick = (value) => {
+    if (value === "cancel") {
+      cancelling = true;
+    }
+    else if (value === "later") {
+      postpone = true;
+    }
+  };
+
+  box.offer(buttons, pick);
+
+  while (payment.status === "pending") {
+    if (postpone) {
+      return null;
+    }
+
+    if (cancelling) {
+      box.offer([], null);
+      box.status("Wird abgebrochen…");
+
+      const cancelled = (await window.checkout.cardCancel(id)).result;
+
+      if (cancelled.ok) {
+        payment = cancelled.payment;
+        break;
+      }
+
+      box.status(`${cancelled.message} Abbruch nicht bestätigt – bitte am Terminal nachsehen.`, "error");
+      cancelling = false;
+      box.offer(buttons, pick);
+    }
+
+    await sleep(1000);
+
+    const polled = (await window.checkout.cardStatus(id)).result;
+
+    if (polled.ok) {
+      payment = polled.payment;
+    }
+    else if (polled.reason === "netz") {
+      box.status("Verbindung zum Vereinsserver gestört – es wird weiter nachgefragt. Das Terminal zeigt das Ergebnis auch selbst.", "error");
+    }
+
+    if (payment.status === "pending" && !waitMore && Date.now() - since > CARD_PATIENCE_MS) {
+      box.status("Vom Terminal kommt keine Rückmeldung. Zeigt es „Zahlung erfolgreich“?", "error");
+      waitMore = true;
+      box.offer([{ label: "Weiter warten", value: "wait" }, ...buttons], (value) => {
+        if (value === "wait") {
+          box.status("Bitte die Karte am Terminal vorhalten lassen.");
+          box.offer(buttons, pick);
+        }
+        else {
+          pick(value);
+        }
+      });
+    }
+  }
+
+  return payment;
+}
+
 async function payByTerminal(sum, terminal) {
   const box = cardBox(sum, terminal.name),
         manual = { label: "Von Hand", value: "manual", kind: "quiet" },
         cancel = { label: "Abbrechen", value: "cancel", kind: "quiet" },
         retry = { label: "Erneut senden", value: "retry" };
 
+  // Gebucht wird im Hauptprozess, aus dem beim Anstoßen gemerkten Bon.
   const finish = async (id) => {
+    box.offer([], null);
     box.status("Bezahlt.", "ok");
-    await sell("karte", { sumup_tx: id });
+
+    const booked = await window.checkout.cardBook(id);
+
+    if (!booked.ok) {
+      box.status(`Bezahlt, aber nicht gebucht: ${booked.message} Die Kasse versucht es nach dem nächsten Abgleich erneut.`, "error");
+      await box.choose([{ label: "OK", value: "ok" }]);
+      box.close();
+
+      return;
+    }
+
+    settled(booked.sale);
     box.close();
   };
 
@@ -428,9 +521,17 @@ async function payByTerminal(sum, terminal) {
     box.offer([], null);
     box.status(`Betrag wird an ${terminal.name} geschickt…`);
 
-    const started = (await window.checkout.cardStart({ amount: sum, description: `${kasse.state.event ? kasse.state.event.name : "Kasse"}` })).result;
+    const started = (await window.checkout.cardStart({ amount: sum, description: `${kasse.state.event ? kasse.state.event.name : "Kasse"}`, items: kasse.bon })).result;
 
     if (!started.ok) {
+      // Eine frühere Zahlung ist bezahlt, aber nicht gebucht: erst die.
+      if (started.reason === "unbooked") {
+        box.close();
+        resumeCard();
+
+        return;
+      }
+
       // Nichts ist beim Terminal angekommen: Von Hand ist ungefährlich.
       box.status(started.message, "error");
 
@@ -449,69 +550,12 @@ async function payByTerminal(sum, terminal) {
       return;
     }
 
-    const id = started.payment.id,
-          since = Date.now();
-
-    let cancelling = false,
-        waitMore = false,
-        payment = started.payment;
-
     box.status("Bitte die Karte am Terminal vorhalten lassen.");
-    box.offer([cancel], () => {
-      cancelling = true;
-    });
 
-    // Nachfragen, bis ein Ergebnis da ist. Kein "Von Hand", solange die
-    // Zahlung am Terminal noch laufen könnte — sonst zahlte der Gast doppelt.
-    while (payment.status === "pending") {
-      if (cancelling) {
-        box.offer([], null);
-        box.status("Wird abgebrochen…");
-
-        const cancelled = (await window.checkout.cardCancel(id)).result;
-
-        if (cancelled.ok) {
-          payment = cancelled.payment;
-          break;
-        }
-
-        box.status(`${cancelled.message} Abbruch nicht bestätigt – bitte am Terminal nachsehen.`, "error");
-        cancelling = false;
-        box.offer([cancel], () => {
-          cancelling = true;
-        });
-      }
-
-      await sleep(1000);
-
-      const polled = (await window.checkout.cardStatus(id)).result;
-
-      if (polled.ok) {
-        payment = polled.payment;
-      }
-      else if (polled.reason === "netz") {
-        box.status("Verbindung zum Vereinsserver gestört – es wird weiter nachgefragt. Das Terminal zeigt das Ergebnis auch selbst.", "error");
-      }
-
-      if (payment.status === "pending" && !waitMore && Date.now() - since > CARD_PATIENCE_MS) {
-        box.status("Vom Terminal kommt keine Rückmeldung. Zeigt es „Zahlung erfolgreich“?", "error");
-        waitMore = true;
-        box.offer([{ label: "Weiter warten", value: "wait" }, cancel], (value) => {
-          if (value === "cancel") {
-            cancelling = true;
-          }
-          else {
-            box.status("Bitte die Karte am Terminal vorhalten lassen.");
-            box.offer([cancel], () => {
-              cancelling = true;
-            });
-          }
-        });
-      }
-    }
+    const payment = await watchPayment(box, started.payment.id, started.payment);
 
     if (payment.status === "successful") {
-      await finish(id);
+      await finish(started.payment.id);
 
       return;
     }
@@ -535,6 +579,67 @@ async function payByTerminal(sum, terminal) {
     }
 
     return;
+  }
+}
+
+/*
+  Eine Kartenzahlung, die beim letzten Mal nicht zu Ende kam — die Kasse
+  ist abgestürzt oder wurde beendet, während der Gast zahlte. Der
+  Hauptprozess hat sie samt Bon gemerkt; hier wird nachgefragt und, wenn
+  bezahlt, gebucht und gedruckt. Beim Start und nach jedem gelungenen
+  Abgleich.
+*/
+let resuming = false;
+
+async function resumeCard() {
+  if (resuming || document.querySelector(".card-dialog")) {
+    return;
+  }
+
+  resuming = true;
+
+  try {
+    const result = await window.checkout.cardPending();
+
+    if (!result.ok || !result.pending) {
+      return;
+    }
+
+    const pending = result.pending,
+          box = cardBox(pending.total, pending.terminal || "SumUp-Terminal");
+
+    box.status(`Diese Kartenzahlung von ${formatDateTime(pending.started_at)} ist nicht abgeschlossen – die Kasse wurde währenddessen beendet. Das Ergebnis wird nachgefragt…`);
+
+    const payment = pending.status === "successful" ? { status: "successful" } : await watchPayment(box, pending.id, { status: "pending" }, { later: true });
+
+    if (!payment) {
+      box.close();
+      toast("Die offene Kartenzahlung wird nach dem nächsten Abgleich wieder nachgefragt.", "info", 9000);
+
+      return;
+    }
+
+    if (payment.status === "successful") {
+      const booked = await window.checkout.cardBook(pending.id);
+
+      if (booked.ok) {
+        kasse.state.lastSale = booked.sale;
+        renderLastSale();
+        box.status(`Bezahlt und als Bon ${booked.sale.number} gebucht. Die Bons werden gedruckt.`, "ok");
+      }
+      else {
+        box.status(`Bezahlt, aber nicht gebucht: ${booked.message}`, "error");
+      }
+    }
+    else {
+      box.status(`${payment.message || "Die Zahlung ist nicht zustande gekommen."} Es wurde nichts gebucht.`, "error");
+    }
+
+    await box.choose([{ label: "OK", value: "ok" }]);
+    box.close();
+  }
+  finally {
+    resuming = false;
   }
 }
 
@@ -652,6 +757,7 @@ async function load() {
   renderStatus(info.sync);
   await loadState();
   renderLastSale();
+  resumeCard();
 }
 
 $("sync-pill").addEventListener("click", async () => {
@@ -664,11 +770,17 @@ $("sync-pill").addEventListener("click", async () => {
 
 $("banner-action").addEventListener("click", () => openSettingsGuarded());
 
-window.checkout.onStatus(renderStatus);
+window.checkout.onStatus((status) => {
+  renderStatus(status);
+
+  if (status.state === "verbunden") {
+    resumeCard();
+  }
+});
 window.checkout.onData(() => loadState());
 window.checkout.onNotices((notices) => {
   for (const n of notices) {
-    toast(n.level === "error" ? `Nicht übernommen: ${n.message}` : n.message, n.level === "error" ? "error" : "info", 9000);
+    toast(n.level === "error" ? `Nicht übernommen: ${n.message}` : n.message, n.level === "info" ? "info" : "error", 9000);
   }
 });
 

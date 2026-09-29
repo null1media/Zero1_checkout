@@ -73,7 +73,10 @@ class StoreError extends Error {}
 class Store {
   constructor(file) {
     this.db = new DatabaseSync(file);
-    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = OFF; PRAGMA busy_timeout = 3000;");
+    // synchronous = FULL: Ein Verkauf ist nach COMMIT auf der Platte, auch
+    // wenn gleich danach der Strom weg ist. Electrons SQLite nimmt das schon
+    // von sich aus; hier steht es, damit es nicht an dessen Fassung hängt.
+    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = OFF; PRAGMA busy_timeout = 3000;");
     this.migrate();
   }
 
@@ -516,15 +519,16 @@ class Store {
   /* ------------------------------------------------------ Verkaufen */
 
   /*
-    Einen Verkauf buchen. Die Oberfläche schickt nur, welche Artikel und ob
-    Verkauf oder Pfandrückgabe; Bezeichnung, Preis und Kategorie kommen von
-    hier, zum Zeitpunkt des Verkaufs festgeschrieben.
+    Den Bon bepreisen: Bezeichnung, Preis und Kategorie von hier, so wie sie
+    in diesem Augenblick gelten.
 
-      items:   [{ article, kind: "verkauf" | "pfandrueckgabe" }], ein Eintrag je Stück
-      payment: "bar" | "karte"
-      given:   bei bar, in Cent, optional
+      items: [{ article, kind: "verkauf" | "pfandrueckgabe" }], ein Eintrag je Stück
+
+    Die Kartenzahlung ruft das vor dem Anstoßen auf und merkt sich das
+    Ergebnis: Gebucht wird später genau, was der Gast bezahlt hat, auch wenn
+    inzwischen ein Preis geändert oder ein Artikel ausverkauft ist.
   */
-  createSale({ event: eventUuid, items, payment, given = null, sumup_tx = null, now = new Date() }) {
+  quote(eventUuid, items) {
     const event = this.event(eventUuid);
 
     if (!event) {
@@ -533,10 +537,6 @@ class Store {
 
     if (!Array.isArray(items) || !items.length) {
       throw new StoreError("Der Bon ist leer.");
-    }
-
-    if (payment !== "bar" && payment !== "karte") {
-      throw new StoreError("Unbekannte Zahlart.");
     }
 
     const lines = items.map((item) => {
@@ -558,9 +558,54 @@ class Store {
 
       return {
         article: a.uuid, name: a.name, category: a.category, category_name: a.category_name || "",
-        price: ret ? -a.price : a.price, deposit: a.deposit, kind: ret ? "pfandrueckgabe" : "verkauf"
+        price: ret ? -a.price : a.price, deposit: Boolean(a.deposit), kind: ret ? "pfandrueckgabe" : "verkauf"
       };
     });
+
+    return { event: event.uuid, lines, total: lines.reduce((sum, l) => sum + l.price, 0) };
+  }
+
+  /*
+    Einen Verkauf buchen. Die Oberfläche schickt nur, welche Artikel und ob
+    Verkauf oder Pfandrückgabe; bepreist wird über quote(). Wer schon
+    bepreiste Positionen hat (eine bezahlte Kartenzahlung), gibt sie als
+    lines mit.
+
+      items:    [{ article, kind: "verkauf" | "pfandrueckgabe" }], ein Eintrag je Stück
+      payment:  "bar" | "karte"
+      given:    bei bar, in Cent, optional
+      sumup_tx: bei Karte über das Terminal; ein zweiter Verkauf mit
+                derselben bucht nichts, sondern liefert den ersten
+  */
+  createSale({ event: eventUuid, items, lines = null, payment, given = null, sumup_tx = null, now = new Date() }) {
+    const event = this.event(eventUuid);
+
+    if (!event) {
+      throw new StoreError("Es ist keine Veranstaltung gewählt.");
+    }
+
+    if (payment !== "bar" && payment !== "karte") {
+      throw new StoreError("Unbekannte Zahlart.");
+    }
+
+    const tx = payment === "karte" && sumup_tx ? String(sumup_tx) : null;
+
+    if (tx) {
+      const booked = this.get("SELECT uuid FROM sales WHERE sumup_tx = ?", tx);
+
+      if (booked) {
+        this.clearCardPending(tx);
+
+        return this.sale(booked.uuid);
+      }
+    }
+
+    if (!lines) {
+      lines = this.quote(event.uuid, items).lines;
+    }
+    else if (!Array.isArray(lines) || !lines.length) {
+      throw new StoreError("Der Bon ist leer.");
+    }
 
     const total = lines.reduce((sum, l) => sum + l.price, 0);
 
@@ -575,22 +620,54 @@ class Store {
     const uuid = crypto.randomUUID(),
           createdAt = localDateTime(now);
 
+    // In einer Transaktion mit dem Verkauf: Die gemerkte Kartenzahlung ist
+    // genau dann erledigt, wenn er gebucht ist.
     this.transaction(() => {
       const number = this.getMeta("bon_number", 0) + 1;
 
       this.setMeta("bon_number", number);
       this.run(
         "INSERT INTO sales (uuid, event, number, created_at, business_day, payment, total, given, sumup_tx) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        uuid, event.uuid, number, createdAt, businessDay(createdAt, event.day_change), payment, total, payment === "bar" ? given : null, payment === "karte" ? sumup_tx : null
+        uuid, event.uuid, number, createdAt, businessDay(createdAt, event.day_change), payment, total, payment === "bar" ? given : null, tx
       );
 
       lines.forEach((l, i) => this.run(
         "INSERT INTO sale_items (sale, position, article, name, category, category_name, price, deposit, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         uuid, i + 1, l.article, l.name, l.category, l.category_name, l.price, l.deposit ? 1 : 0, l.kind
       ));
+
+      if (tx) {
+        this.clearCardPending(tx);
+      }
     });
 
     return this.sale(uuid);
+  }
+
+  /*
+    Die laufende Kartenzahlung, gemerkt ab dem Anstoßen am Terminal. Stürzt
+    die Kasse ab, während der Gast zahlt, weiß sie nach dem Neustart, wonach
+    sie fragen und was sie buchen muss. Es gibt höchstens eine: Das Terminal
+    nimmt nur eine Zahlung zugleich.
+
+      { id, event, lines, total, terminal, started_at, status }
+  */
+  cardPending() {
+    return this.getMeta("card_pending");
+  }
+
+  setCardPending(payment) {
+    this.setMeta("card_pending", payment);
+  }
+
+  // Nur die gemeinte: Eine spätere Antwort zu einer alten Zahlung räumt
+  // keine neue weg.
+  clearCardPending(id) {
+    const pending = this.cardPending();
+
+    if (pending && pending.id === id) {
+      this.run("DELETE FROM meta WHERE key = 'card_pending'");
+    }
   }
 
   sale(uuid) {
